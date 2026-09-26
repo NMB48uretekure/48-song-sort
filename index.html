@@ -51,6 +51,12 @@
   .rk-bar { height: 4px; border-radius: 2px; margin-top: 4px; }
   .resume-box { border: 2px solid var(--main); }
   .resume-msg { font-weight: bold; margin: 0 0 4px; }
+  .rank-promo { margin: 22px 0 6px; padding: 16px 12px 16px; border-radius: 16px; color: #fff;
+    background: linear-gradient(135deg, #f06a9f, #e0457b 60%, #c9306a); box-shadow: 0 6px 18px rgba(224,69,123,.35); }
+  .rp-title { margin: 0; font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+  .rp-text { margin: 6px 0 0; font-size: 13px; line-height: 1.6; }
+  .rp-text b { font-size: 15px; }
+  .rp-btn { margin-top: 12px; background: #fff; color: var(--main-dark); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
   .site-note { max-width: 500px; margin: 10px auto 0; font-size: 11px; color: #999; line-height: 1.7; }
   .hidden { display: none !important; }
 
@@ -74,6 +80,13 @@
   .pick-sub { margin: 2px 0 8px; font-size: 11px; color: #999; }
   #grp-chips .chip { font-size: 15px; padding: 10px 16px; border-width: 2px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
   #grp-chips .chip:not(.on) { background: #fff; }
+  .top-choices { display: flex; gap: 8px; margin: 0 0 10px; }
+  .top-choice { flex: 1; padding: 10px 4px; border-radius: 12px; background: #fff; color: var(--main-dark); border: 2px solid var(--line); font-weight: normal; }
+  .top-choice b { display: block; font-size: 17px; }
+  .top-choice small { display: block; font-size: 10px; color: #999; margin-top: 2px; }
+  .top-choice.active { background: var(--main); border-color: var(--main); color: #fff; }
+  .top-choice.active small { color: #ffe3ee; }
+  .list-label { margin-top: 6px; }
   .allchip { background: #fff; color: #555; border-color: #999; }
   .allchip.on { background: var(--main); color: #fff; border-color: var(--main); }
   .gchip.on { background: var(--gc); border-color: var(--gc); color: #fff; }
@@ -134,13 +147,8 @@
 </div>
 
 <div id="phase1" class="step-container">
-  <h2>好きな曲を選んでください</h2>
-  <div class="tabs">
-    <button class="tab" data-top="7" onclick="setTop(7)">TOP7</button>
-    <button class="tab active" data-top="10" onclick="setTop(10)">TOP10</button>
-    <button class="tab" data-top="16" onclick="setTop(16)">TOP16</button>
-  </div>
-  <p class="desc">好きな曲をタップして選んでください。選んだ曲の中から2択バトルで順位を決めます！<br>たくさん選ぶほどバトルの回数が増えます</p>
+  <h2>あなたの好きな曲ランキングを作ろう</h2>
+  <p class="desc">下の①〜④の順に選ぶと、選んだ曲の中から<br>2択バトルで順位が決まります！</p>
   <div class="pick-sec" id="grp-sec">
     <p class="pick-label"><span class="step">1</span>ソートしたいグループを選んでください</p>
     <p class="pick-sub">いくつでも選べます</p>
@@ -151,6 +159,17 @@
     <p class="pick-sub">はじめは全部選ばれています</p>
     <div class="chips" id="cat-chips"></div>
   </div>
+  <div class="pick-sec pick-sec2">
+    <p class="pick-label"><span class="step">3</span>何位まで決める？</p>
+    <p class="pick-sub">決めたい順位の数を選んでください</p>
+    <div class="top-choices">
+      <button class="top-choice" data-top="7" onclick="setTop(7)"><b>TOP7</b><small>1〜7位を決める</small></button>
+      <button class="top-choice active" data-top="10" onclick="setTop(10)"><b>TOP10</b><small>1〜10位を決める</small></button>
+      <button class="top-choice" data-top="16" onclick="setTop(16)"><b>TOP16</b><small>1〜16位を決める</small></button>
+    </div>
+  </div>
+  <p class="pick-label list-label"><span class="step">4</span>好きな曲をタップして選んでください</p>
+  <p class="pick-sub">たくさん選ぶほどバトルの回数が増えます</p>
   <input class="search" id="search" type="search" placeholder="曲名・シングル・アルバム・公演名で検索" oninput="renderList()">
   <div class="bulk">
     <button class="btn-small btn-light" onclick="bulk(true)">表示中の曲を全部選ぶ</button>
@@ -183,6 +202,11 @@
   <p class="help">画像を長押ししても保存できます</p>
   <button class="btn-wide btn-twitter" onclick="shareToX()">𝕏 に画像つきで投稿する</button>
   <button class="btn-wide" onclick="saveImage()">画像を保存する</button>
+  <div class="rank-promo" id="rank-promo">
+    <p class="rp-title">みんなの人気曲ランキング</p>
+    <p class="rp-text" id="rp-text">みんなが選んだ人気曲をチェックしよう！</p>
+    <button class="btn-wide rp-btn" onclick="openRanking()">ランキングを見る</button>
+  </div>
   <button class="btn-wide btn-light" onclick="restart()">最初からやり直す</button>
 </div>
 
@@ -194,7 +218,7 @@
   <div class="tabs" id="rk-kind">
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
-    <button class="tab" data-rk="in" onclick="setRankKind('in')">TOP7入り</button>
+    <button class="tab" data-rk="in" onclick="setRankKind('in')">TOP16入り</button>
   </div>
   <p class="help" id="rk-help"></p>
   <div id="rk-list"></div>
@@ -533,6 +557,32 @@ function openRanking() {
   loadRanking();
 }
 function closeRanking() { showPhase(1); window.scrollTo(0, 0); }
+// 結果画面：自分の1位の曲がみんなのランキングで何位かを表示
+async function updateRankPromo() {
+  const box = document.getElementById('rank-promo');
+  box.classList.toggle('hidden', !STATS.csvUrl);
+  const txt = document.getElementById('rp-text');
+  txt.textContent = 'みんなが選んだ人気曲をチェックしよう！';
+  if (!STATS.csvUrl || !finalList.length) return;
+  try {
+    const url = STATS.csvUrl + (STATS.csvUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const rows = parseCSV(await (await fetch(url)).text()).filter(r => r.some(c => c.trim()));
+    const head = rows.shift() || [];
+    const idx = Array.from({ length: 16 }, (_, k) => head.findIndex(c => c.trim() === (k + 1) + '位'));
+    const score = new Map();
+    rows.forEach(r => idx.forEach((i, k) => { const key = i >= 0 ? (r[i] || '').trim() : ''; if (key) score.set(key, (score.get(key) || 0) + 16 - k); }));
+    const my = songKey(finalList[0]);
+    const sorted = [...score.entries()].sort((a, b) => b[1] - a[1]);
+    const pos = sorted.findIndex(([k]) => k === my);
+    if (pos >= 0) {
+      const rank = sorted.findIndex(([, v]) => v === sorted[pos][1]) + 1;
+      txt.innerHTML = '';
+      txt.append('あなたの1位「', Object.assign(document.createElement('b'), { textContent: dispName(finalList[0].t) }),
+        `」は、みんなのランキングで今 `, Object.assign(document.createElement('b'), { textContent: `${rank}位` }), ' です！');
+    }
+  } catch (e) {}
+}
+
 async function loadRanking() {
   const total = document.getElementById('rk-total');
   if (!STATS.csvUrl) { total.textContent = 'ランキングはまだ準備中です'; return; }
@@ -541,7 +591,7 @@ async function loadRanking() {
     const url = STATS.csvUrl + (STATS.csvUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
     const rows = parseCSV(await (await fetch(url)).text()).filter(r => r.some(c => c.trim()));
     const head = rows.shift() || [];
-    const idx = [1, 2, 3, 4, 5, 6, 7].map(n => head.findIndex(c => c.trim().startsWith(n + '位')));
+    const idx = Array.from({ length: 16 }, (_, k) => head.findIndex(c => c.trim() === (k + 1) + '位'));
     rkRows = rows.map(r => idx.map(i => (i >= 0 ? (r[i] || '').trim() : '')));
     renderRanking();
   } catch (e) {
@@ -568,19 +618,22 @@ function setRankKind(k) {
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件`;
   document.getElementById('rk-help').textContent = {
-    point: '1位=7点、2位=6点 … 7位=1点の合計',
+    point: '1位=16点、2位=15点 … 16位=1点の合計',
     first: '1位に選ばれた回数',
-    in: 'TOP7（1〜7位）に入った回数',
+    in: 'TOP16（1〜16位）に入った回数',
   }[rkKind];
   const byKey = new Map(SONGS.map(s => [songKey(s), s]));
   const score = new Map();
   rkRows.forEach(r => r.forEach((k, i) => {
     const s = byKey.get(k);
     if (!s || (rkGrp !== 'all' && s.a !== rkGrp)) return;
-    const add = rkKind === 'first' ? (i === 0 ? 1 : 0) : rkKind === 'in' ? 1 : 7 - i;
+    const add = rkKind === 'first' ? (i === 0 ? 1 : 0) : rkKind === 'in' ? 1 : 16 - i;
     if (add) score.set(s, (score.get(s) || 0) + add);
   }));
-  const list = [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50);
+  // 16位まで表示（16位が同点で並んだときは同点の曲も全部出す）
+  const all = [...score.entries()].sort((a, b) => b[1] - a[1]);
+  const cut = all.length > 16 ? all[15][1] : -Infinity;
+  const list = all.filter(([, v], i) => i < 16 || v === cut);
   const box = document.getElementById('rk-list');
   box.innerHTML = list.length ? '' : '<p class="empty-msg">まだデータがありません</p>';
   const max = list.length ? list[0][1] : 1, unit = rkKind === 'point' ? '点' : '回';
@@ -791,7 +844,7 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 
 function showPhase(n) {
   [1, 2, 3, 4].forEach(i => document.getElementById('phase' + i).classList.toggle('hidden', i !== n));
-  document.getElementById('rank-link').classList.toggle('hidden', !STATS.csvUrl || n === 4 || n === 2);
+  document.getElementById('rank-link').classList.toggle('hidden', !STATS.csvUrl || n !== 1);   // 予選画面のときだけ表示
   document.getElementById('sticky-bar').classList.toggle('hidden', n !== 1);
 }
 
@@ -929,6 +982,7 @@ function showRanking() {
   for (let i = 1; i < finalList.length; i++) if (tied(finalList[i - 1], finalList[i])) finalRanks[i] = finalRanks[i - 1];
 
   sendResult(finalList);
+  updateRankPromo();
   showPhase(3);
   window.scrollTo(0, 0);
   document.getElementById('result-title').textContent = `あなたの好きな曲TOP${finalList.length}ができました！`;
