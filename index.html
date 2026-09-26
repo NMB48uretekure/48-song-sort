@@ -49,6 +49,8 @@
   .rk-row .ct { font-weight: bold; font-size: 16px; flex-shrink: 0; }
   .rk-row .ct small { font-size: 11px; color: #999; font-weight: normal; }
   .rk-bar { height: 4px; border-radius: 2px; margin-top: 4px; }
+  .resume-box { border: 2px solid var(--main); }
+  .resume-msg { font-weight: bold; margin: 0 0 4px; }
   .site-note { max-width: 500px; margin: 10px auto 0; font-size: 11px; color: #999; line-height: 1.7; }
   .hidden { display: none !important; }
 
@@ -62,6 +64,18 @@
     border: 1.5px solid var(--line); font-weight: bold; }
   .chip.on { background: var(--main); color: #fff; border-color: var(--main); }
   .gchip { color: var(--gc); border-color: var(--gc); }
+  .pick-sec { background: #fff; border: 2px solid var(--main); border-radius: 14px; padding: 12px 10px 4px; margin: 4px 0 12px; }
+  .pick-sec.need { animation: needPick 1.6s ease-in-out infinite; }
+  @keyframes needPick { 0%, 100% { box-shadow: 0 0 0 0 rgba(224,69,123,.0); } 50% { box-shadow: 0 0 0 6px rgba(224,69,123,.25); } }
+  .pick-sec2 { border-color: var(--line); }
+  .pick-label { margin: 0; font-weight: bold; font-size: 15px; color: #333; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .pick-label .step { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--main); color: #fff; font-size: 13px; align-items: center; justify-content: center; }
+  .pick-sec2 .pick-label .step { background: #d9a3b7; }
+  .pick-sub { margin: 2px 0 8px; font-size: 11px; color: #999; }
+  #grp-chips .chip { font-size: 15px; padding: 10px 16px; border-width: 2px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  #grp-chips .chip:not(.on) { background: #fff; }
+  .allchip { background: #fff; color: #555; border-color: #999; }
+  .allchip.on { background: var(--main); color: #fff; border-color: var(--main); }
   .gchip.on { background: var(--gc); border-color: var(--gc); color: #fff; }
   .search { width: 100%; padding: 10px 12px; font-size: 15px; border: 2px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
   .bulk { display: flex; gap: 8px; justify-content: center; margin-bottom: 6px; }
@@ -113,6 +127,12 @@
 <p class="desc">AKB48・SKE48・NMB48・HKT48・NGT48・STU48・SDN48 の表題曲・カップリング・アルバム曲・劇場公演曲・ユニット曲から</p>
 
 <!-- 予選 -->
+<div id="resume-box" class="step-container resume-box hidden">
+  <p class="resume-msg" id="resume-msg">前回のソートが途中です</p>
+  <button class="btn-wide" onclick="resumeSort()">続きから再開する</button>
+  <button class="btn-wide btn-light" onclick="discardResume()">最初からやる</button>
+</div>
+
 <div id="phase1" class="step-container">
   <h2>好きな曲を選んでください</h2>
   <div class="tabs">
@@ -121,8 +141,16 @@
     <button class="tab" data-top="16" onclick="setTop(16)">TOP16</button>
   </div>
   <p class="desc">好きな曲をタップして選んでください。選んだ曲の中から2択バトルで順位を決めます！<br>たくさん選ぶほどバトルの回数が増えます</p>
-  <div class="chips" id="grp-chips"></div>
-  <div class="chips" id="cat-chips"></div>
+  <div class="pick-sec" id="grp-sec">
+    <p class="pick-label"><span class="step">1</span>ソートしたいグループを選んでください</p>
+    <p class="pick-sub">いくつでも選べます</p>
+    <div class="chips" id="grp-chips"></div>
+  </div>
+  <div class="pick-sec pick-sec2">
+    <p class="pick-label"><span class="step">2</span>曲の種類をしぼる</p>
+    <p class="pick-sub">はじめは全部選ばれています</p>
+    <div class="chips" id="cat-chips"></div>
+  </div>
   <input class="search" id="search" type="search" placeholder="曲名・シングル・アルバム・公演名で検索" oninput="renderList()">
   <div class="bulk">
     <button class="btn-small btn-light" onclick="bulk(true)">表示中の曲を全部選ぶ</button>
@@ -582,7 +610,7 @@ const dispSrc = t => t.split(SUZUKAKE).join('鈴懸なんちゃら');
 const CATS = ['表題曲', 'カップリング', 'アルバム', '公演曲', 'ユニット'];
 const GROUPS = ['AKB48', 'SKE48', 'NMB48', 'HKT48', 'NGT48', 'STU48', 'SDN48'];
 const GCOLOR = { AKB48: '#e8468f', SKE48: '#f2a900', NMB48: '#f06a00', HKT48: '#3a3a3a', NGT48: '#d7263d', STU48: '#1f8fd1', SDN48: '#7b3fa0' };
-let grpOn = new Set(GROUPS);
+let grpOn = new Set();   // 最初はどのグループも選ばれていない状態
 let TOP_N = 10;
 let catOn = new Set(CATS);
 let selected = new Set();
@@ -647,6 +675,14 @@ function setTop(n) {
 function buildGroupChips() {
   const box = document.getElementById('grp-chips');
   box.innerHTML = '';
+  // 全グループをまとめて選ぶ／外すボタン
+  const all = document.createElement('button');
+  const allOn = GROUPS.every(g => grpOn.has(g));
+  all.className = 'chip allchip' + (allOn ? ' on' : '');
+  all.textContent = '全グループ';
+  all.onclick = () => { grpOn = allOn ? new Set() : new Set(GROUPS); buildGroupChips(); renderList(); };
+  box.appendChild(all);
+  document.getElementById('grp-sec').classList.toggle('need', grpOn.size === 0);
   GROUPS.forEach(g => {
     const b = document.createElement('button');
     b.className = 'chip gchip' + (grpOn.has(g) ? ' on' : '');
@@ -679,7 +715,7 @@ function renderList() {
   box.innerHTML = '';
   const list = visibleSongs();
   if (!list.length) {
-    box.innerHTML = `<div class="empty-msg">${!grpOn.size ? 'グループを1つ以上選んでください' : catOn.size ? '見つかりませんでした' : '種類を1つ以上選んでください'}</div>`;
+    box.innerHTML = `<div class="empty-msg">${!grpOn.size ? '上のボタンからグループを選んでください（全部まとめてなら「全グループ」）' : catOn.size ? '見つかりませんでした' : '種類を1つ以上選んでください'}</div>`;
     return;
   }
   let g = null, wrap = null;
@@ -731,6 +767,7 @@ function bulk(on) {
 function clearAll() { selected.clear(); refreshMarks(); }
 
 function updateBar() {
+  saveSelection();
   const n = selected.size;
   document.getElementById('sel-count').textContent = n;
   document.getElementById('clear-btn').disabled = n === 0;
@@ -763,6 +800,7 @@ function startSort() {
   const list = shuffle(SONGS.filter(s => selected.has(s.id)));
   sortQueues = list.map(s => [s]);
   parentQueue = []; undoStack = []; battleCount = 0; ties = [];
+  document.getElementById('resume-box').classList.add('hidden');
   showPhase(2);
   window.scrollTo(0, 0);
   nextMergeStep();
@@ -805,10 +843,64 @@ function renderBattle(a, b) {
   document.getElementById('f1-s').textContent = dispSrc(b.s);
   document.getElementById('progress-desc').textContent = `第${battleCount + 1}戦`;
   document.getElementById('undo-btn').disabled = undoStack.length === 0;
+  saveProgress();
+}
+
+/* ---------- 途中保存（ページが消えても続きから再開できるように） ---------- */
+const SAVE_KEY = 'g48sort-progress';
+const DATA_KEY = SONGS.length + ':' + SONGS[0].t + ':' + SONGS[SONGS.length - 1].t;   // 曲データが変わったら古い保存は使わない
+const ids = q => q.map(s => s.id);
+const objs = q => q.map(i => SONGS[i]);
+function snapshot() {
+  return JSON.stringify({
+    sq: sortQueues.map(ids),
+    pq: parentQueue.map(p => ({ l: ids(p.left), r: ids(p.right), m: ids(p.merged) })),
+    bc: battleCount, ties,
+  });
+}
+function restoreSnap(str) {
+  const s = JSON.parse(str);
+  sortQueues = s.sq.map(objs);
+  parentQueue = s.pq.map(p => ({ left: objs(p.l), right: objs(p.r), merged: objs(p.m) }));
+  battleCount = s.bc; ties = s.ties || [];
+}
+const SEL_KEY = 'g48sort-selection';
+// 選んだ曲とTOP数（予選の状態）
+function saveSelection() {
+  try { localStorage.setItem(SEL_KEY, JSON.stringify({ key: DATA_KEY, top: TOP_N, sel: [...selected] })); } catch (e) {}
+}
+// バトルの途中経過
+function saveProgress() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ key: DATA_KEY, top: TOP_N, snap: snapshot(), undo: undoStack.slice(-60) }));
+  } catch (e) {}
+}
+function readSaved(k) {
+  try {
+    const d = JSON.parse(localStorage.getItem(k) || 'null');
+    return d && d.key === DATA_KEY ? d : null;
+  } catch (e) { return null; }
+}
+const loadProgress = () => readSaved(SAVE_KEY);
+function clearSortProgress() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+function resumeSort() {
+  const d = loadProgress();
+  document.getElementById('resume-box').classList.add('hidden');
+  if (!d || !d.snap) return;
+  if ([7, 10, 16].includes(d.top)) TOP_N = d.top;
+  restoreSnap(d.snap);
+  undoStack = d.undo || [];
+  showPhase(2);
+  window.scrollTo(0, 0);
+  processNextPair();
+}
+function discardResume() {
+  document.getElementById('resume-box').classList.add('hidden');
+  clearSortProgress();
 }
 
 function selectWinner(choice) {
-  undoStack.push(JSON.stringify({ sortQueues, parentQueue, battleCount, ties }));
+  undoStack.push(snapshot());
   const p = parentQueue[0];
   if (choice === 2) {
     const a = p.left.shift(), b = p.right.shift();
@@ -823,14 +915,14 @@ function selectWinner(choice) {
 
 function undo() {
   if (!undoStack.length) return;
-  const s = JSON.parse(undoStack.pop());
-  sortQueues = s.sortQueues; parentQueue = s.parentQueue; battleCount = s.battleCount; ties = s.ties || [];
+  restoreSnap(undoStack.pop());
   showPhase(2);
   processNextPair();
 }
 
 /* ---------- 結果 ---------- */
 function showRanking() {
+  clearSortProgress();
   finalList = (sortQueues[0] || []).slice(0, TOP_N);
   const tied = (x, y) => ties.includes(x.id + '|' + y.id) || ties.includes(y.id + '|' + x.id);
   finalRanks = finalList.map((s, i) => i + 1);
@@ -998,8 +1090,25 @@ function restart() {
   refreshMarks();
 }
 
+(() => {
+  // 前回の選択を復元し、途中のソートがあれば「続きから」を出す
+  const s = readSaved(SEL_KEY);
+  if (s) {
+    if ([7, 10, 16].includes(s.top)) TOP_N = s.top;
+    (s.sel || []).forEach(i => { if (SONGS[i]) selected.add(i); });
+  }
+  const d = loadProgress();
+  if (d) {
+    if (d.snap) {
+      const bc = JSON.parse(d.snap).bc;
+      document.getElementById('resume-msg').textContent = `前回のソートが途中です（第${bc + 1}戦から）`;
+      document.getElementById('resume-box').classList.remove('hidden');
+    }
+  }
+})();
 buildGroupChips();
 buildChips();
+setTop(TOP_N);
 renderList();
 showPhase(1);
 </script>
