@@ -1092,10 +1092,10 @@ function pageUrl() {
   try { const u = new URL(location.href); if (!/^https?:$/.test(u.protocol)) return ''; u.search = ''; u.hash = ''; return u.toString(); }
   catch (e) { return ''; }
 }
-// 結果が1グループだけなら「#(グループ名)楽曲ソート」、混ざっていれば「#48G楽曲ソート」
+// 結果が1グループだけなら「#(グループ名)楽曲ソート #48G楽曲ソート」、混ざっていれば「#48G楽曲ソート」
 function resultTag() {
   const gs = new Set(finalList.map(s => s.a));
-  return gs.size === 1 ? `#${[...gs][0]}楽曲ソート` : '#48G楽曲ソート';
+  return gs.size === 1 ? `#${[...gs][0]}楽曲ソート #48G楽曲ソート` : '#48G楽曲ソート';
 }
 // ツイートでは長すぎる曲名を通称にする
 const SHARE_ALIAS = { '鈴懸の木の道で「君の微笑みを夢に見る」と言ってしまったら僕たちの関係はどう変わってしまうのか、僕なりに何日か考えた上でのやや気恥ずかしい結論のようなもの': '鈴懸なんちゃら' };
