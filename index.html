@@ -57,6 +57,11 @@
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
   .rk-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: #666; font-weight: normal; }
   .rk-stats b { color: #333; font-size: 13px; }
+  .also { margin-top: 8px; padding: 8px 10px; background: var(--sub); border-radius: 10px; }
+  .also p { margin: 0 0 6px; font-size: 11px; font-weight: bold; color: var(--main-dark); }
+  .also .chips { justify-content: flex-start; margin: 0; }
+  .also .chip { font-size: 11px; padding: 4px 9px; text-align: left; }
+  .also .chip small { font-weight: normal; opacity: .75; margin-left: 2px; }
   .listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px 10px; border-radius: 999px;
     font-size: 11px; font-weight: bold; text-decoration: none; color: #fff; background: #e62117; }
   .listen:active { opacity: .7; }
@@ -226,7 +231,7 @@
   <h2>みんなの人気曲ランキング</h2>
   <p class="desc" id="rk-total">読み込み中…</p>
   <div class="chips" id="rk-grp"></div>
-  <input class="search" id="rk-search" type="search" placeholder="曲名で検索して選ばれた回数を見る" oninput="renderRanking()">
+  <input class="search" id="rk-search" type="search" placeholder="曲名で検索（ランキングの曲をタップしても見られます）" oninput="renderRanking()">
   <div class="tabs" id="rk-kind">
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
@@ -759,7 +764,20 @@ function renderRankSearch(q, byKey) {
   const box = document.getElementById('rk-list');
   box.innerHTML = hits.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
   if (hits.length) { const p = document.createElement('p'); p.className = 'help'; p.style.margin = '0 0 4px'; p.textContent = `${hits.length}曲`; box.appendChild(p); }
-  hits.slice(0, 100).forEach(s => {
+  // 「この曲を選んだ人は、こんな曲も選んでいます」用：曲ごとに、その曲が入っている投票の番号
+  const rowsOf = new Map();
+  rkRows.forEach((r, ri) => r.forEach(k => { const t = byKey.get(k); if (t) { if (!rowsOf.has(t)) rowsOf.set(t, []); rowsOf.get(t).push(ri); } }));
+  const alsoFor = s => {
+    const mine = rowsOf.get(s) || [];
+    const co = new Map();
+    mine.forEach(ri => new Set(rkRows[ri]).forEach(k => { const t = byKey.get(k); if (t && t !== s) co.set(t, (co.get(t) || 0) + 1); }));
+    const minCo = mine.length >= 10 ? 2 : 1;   // 票が多い曲は、たまたま1回いっしょだった曲を外す
+    // 人気曲ばかり出ないよう、いっしょに選ばれた回数を相手の人気（TOP16入り回数）で割り引いて並べる
+    return [...co.entries()].filter(([t, n]) => n >= minCo)
+      .map(([t, n]) => [t, n, n / Math.sqrt(mine.length * (rowsOf.get(t) || []).length)])
+      .sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, 6);
+  };
+  hits.slice(0, 100).forEach((s, hi) => {
     const x = st.get(s);
     const row = document.createElement('div'); row.className = 'rk-row';
     const rk = document.createElement('div'); rk.className = 'rk';
@@ -775,6 +793,22 @@ function renderRankSearch(q, byKey) {
       nm.appendChild(pos);
     }
     nm.appendChild(listenLink(s));
+    if (x.in && hi < 10) {
+      const also = alsoFor(s);
+      if (also.length) {
+        const w = document.createElement('div'); w.className = 'also';
+        const p = document.createElement('p'); p.textContent = 'この曲を選んだ人は、こんな曲も選んでいます'; w.appendChild(p);
+        const cs = document.createElement('div'); cs.className = 'chips';
+        also.forEach(([t, n]) => {
+          const b = document.createElement('button'); b.className = 'chip';
+          b.textContent = dispName(t.t);
+          const sm2 = document.createElement('small'); sm2.textContent = `${t.a}・${n}人`; b.appendChild(sm2);
+          b.onclick = () => { const inp = document.getElementById('rk-search'); inp.value = dispName(t.t); renderRanking(); inp.scrollIntoView({ block: 'center' }); };
+          cs.appendChild(b);
+        });
+        w.appendChild(cs); nm.appendChild(w);
+      }
+    }
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${x.in}<small>回</small>`;
     row.append(rk, jacketEl(s.j), nm, ct);
     box.appendChild(row);
@@ -842,6 +876,9 @@ function renderRanking() {
       bar.style.width = Math.max(4, v / max * 100) + '%'; bar.style.background = GCOLOR[s.a];
       nm.appendChild(bar);
     }
+    nm.style.cursor = 'pointer';
+    nm.title = 'タップで詳しく見る';
+    nm.onclick = e => { if (e.target.closest('a')) return; const inp = document.getElementById('rk-search'); inp.value = dispName(s.t); renderRanking(); inp.scrollIntoView({ block: 'center' }); };
     nm.appendChild(document.createElement('br'));
     nm.appendChild(listenLink(s));
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${v}<small>${unit}</small>`;
