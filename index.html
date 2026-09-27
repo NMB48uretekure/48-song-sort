@@ -982,7 +982,7 @@ function parseStamp(t) {
 // ---------- 順位の推移（折れ線グラフ） ----------
 // 8色×（実線・点線）で16曲を区別する
 const TREND_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
-const TREND_N = 16;
+const TREND_N = 16, TREND_CAP = 30;
 let trendFocus = null, trendFrom = null;
 function renderTrend(byKey) {
   const box = document.getElementById('rk-list');
@@ -990,49 +990,54 @@ function renderTrend(byKey) {
   const pool = new Set(SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp));
   const ev = rkRows.map((r, i) => [rkTimes[i], r]).filter(([t]) => t).sort((a, b) => a[0] - b[0]);
   if (ev.length < 2) { box.innerHTML = '<p class="empty-msg">まだデータが足りません</p>'; return; }
-  // 開始時刻：ランキングに200曲が出揃った時点から（グループで絞って200曲に届かないときは、最終的に出てくる曲数まで）
-  const everPts = new Set();
-  ev.forEach(([, r]) => r.forEach(k => { const s = byKey.get(k); if (s && pool.has(s)) everPts.add(s); }));
-  const need = Math.min(200, everPts.size);
-  let startIdx = 0;
-  { const seen = new Set();
-    for (let n = 0; n < ev.length; n++) {
-      ev[n][1].forEach(k => { const s = byKey.get(k); if (s && pool.has(s)) seen.add(s); });
-      if (seen.size >= need) { startIdx = n; break; }
-    } }
-  trendFrom = ev[startIdx][0];
-  // 区切りの時刻：全体を12前後に分ける（1・2・3・6・12時間、1日単位）
-  const t0 = ev[startIdx][0].getTime(), t1 = ev[ev.length - 1][0].getTime();
-  const H = 3600e3, span = Math.max(t1 - t0, H);
+  // 時刻の列ごとに、その時点までの累計ポイントで順位を出す
+  const snapAt = times => {
+    const pts = new Map(), out = []; let e = 0;
+    times.forEach(cp => {
+      while (e < ev.length && ev[e][0].getTime() <= cp) {
+        ev[e][1].forEach((k, i) => { const s = byKey.get(k); if (s && pool.has(s)) pts.set(s, (pts.get(s) || 0) + 16 - i); });
+        e++;
+      }
+      const arr = [...pts.entries()].sort((a, b) => b[1] - a[1]);
+      const rank = new Map(); let r = 0, prev = null;
+      arr.forEach(([s, v], i) => { if (v !== prev) { r = i + 1; prev = v; } rank.set(s, r); });
+      out.push(rank);
+    });
+    return out;
+  };
+  const H = 3600e3;
+  const tFirst = ev[0][0].getTime(), t1 = ev[ev.length - 1][0].getTime();
+  // 1時間ごとに調べて、グラフが意味を持つところ（いまの上位16曲のうち12曲以上が30位以内に入った時点）を探す
+  const fine = [];
+  for (let t = tFirst; t < t1; t += H) fine.push(t);
+  fine.push(t1);
+  const fineSnaps = snapAt(fine);
+  const last = fineSnaps[fineSnaps.length - 1];
+  const top = [...last.entries()].sort((a, b) => a[1] - b[1]).slice(0, TREND_N).map(([s]) => s);
+  if (!top.length) { box.innerHTML = '<p class="empty-msg">まだデータがありません</p>'; return; }
+  const needIn = Math.min(12, top.length);
+  let si = fine.length - 1;
+  for (let n = 0; n < fine.length; n++) {
+    if (top.filter(s => (fineSnaps[n].get(s) || 1e9) <= TREND_CAP).length >= needIn) { si = n; break; }
+  }
+  const t0 = fine[si];
+  trendFrom = new Date(t0);
+  // 表示の区切り：開始〜いまを12前後に分ける（1・2・3・6・12時間、1日単位）
+  const span = Math.max(t1 - t0, H);
   const step = [1, 2, 3, 6, 12, 24, 48, 72, 168].map(h => h * H).find(x => span / x <= 12) || 168 * H;
   const start = new Date(t0); start.setMinutes(0, 0, 0);
   if (step >= 24 * H) start.setHours(0);
   else start.setHours(Math.floor(start.getHours() / (step / H)) * (step / H));
-  const cps = [];
-  cps.push(t0);
+  const cps = [t0];
   for (let t = start.getTime() + step; t < t1; t += step) if (t > t0) cps.push(t);
   if (t1 > t0) cps.push(t1);
-  // 区切りごとの累計ポイント → 順位
-  const pts = new Map(), snaps = [];
-  let e = 0;
-  cps.forEach(cp => {
-    while (e < ev.length && ev[e][0].getTime() <= cp) {
-      ev[e][1].forEach((k, i) => { const s = byKey.get(k); if (s && pool.has(s)) pts.set(s, (pts.get(s) || 0) + 16 - i); });
-      e++;
-    }
-    const arr = [...pts.entries()].sort((a, b) => b[1] - a[1]);
-    const rank = new Map(); let r = 0, prev = null;
-    arr.forEach(([s, v], i) => { if (v !== prev) { r = i + 1; prev = v; } rank.set(s, r); });
-    snaps.push(rank);
-  });
-  const last = snaps[snaps.length - 1];
-  const top = [...last.entries()].sort((a, b) => a[1] - b[1]).slice(0, TREND_N).map(([s]) => s);
-  if (!top.length) { box.innerHTML = '<p class="empty-msg">まだデータがありません</p>'; return; }
-  const series = top.map((s, k) => ({ s, color: TREND_COLORS[k % 8], dash: k >= 8, ranks: snaps.map(m => m.get(s) || null) }));
+  const snaps = snapAt(cps);
+  // 30位より下は「圏外」として線を切る
+  const series = top.map((s, k) => ({ s, color: TREND_COLORS[k % 8], dash: k >= 8, ranks: snaps.map(m => { const r = m.get(s); return r && r <= TREND_CAP ? r : null; }) }));
   if (trendFocus && !top.includes(trendFocus)) trendFocus = null;
   // 描画
   const W = 340, Ht = 300, L = 30, R = 12, T = 12, B = 30;
-  const maxRank = Math.max(16, ...series.flatMap(x => x.ranks.filter(Boolean)));
+  const maxRank = TREND_CAP;
   const X = i => L + (cps.length === 1 ? 0 : i / (cps.length - 1)) * (W - L - R);
   const Y = r => T + (r - 1) / (maxRank - 1) * (Ht - T - B);
   const fmt = t => { const d = new Date(t); return step >= 24 * H ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}時`; };
@@ -1040,7 +1045,7 @@ function renderTrend(byKey) {
   const el = (n, a) => { const x = document.createElementNS(NS, n); for (const k in a) x.setAttribute(k, a[k]); return x; };
   const wrap = document.createElement('div'); wrap.className = 'trend';
   const svg = el('svg', { viewBox: `0 0 ${W} ${Ht}`, role: 'img', 'aria-label': '順位の推移' });
-  const yt = [...new Set([1, Math.round(maxRank / 4), Math.round(maxRank / 2), Math.round(maxRank * 3 / 4), maxRank])].filter(v => v >= 1);
+  const yt = [1, 5, 10, 15, 20, 25, 30].filter(v => v <= maxRank);
   yt.forEach(v => {
     svg.appendChild(el('line', { class: 'grid', x1: L, x2: W - R, y1: Y(v), y2: Y(v) }));
     const tx = el('text', { class: 'ax', x: L - 6, y: Y(v) + 3.5, 'text-anchor': 'end' }); tx.textContent = v + '位'; svg.appendChild(tx);
@@ -1104,15 +1109,15 @@ function renderTrend(byKey) {
     row.classList.add('tl-row'); if (trendFocus === x.s) row.classList.add('on');
     row.onclick = e => { if (e.target.closest('button, a')) return; trendFocus = trendFocus === x.s ? null : x.s; renderRanking(); };
     const nm = songNameEl(x.s);
-    const moved = x.ranks.find(Boolean);
+    const r0 = x.ranks[0];
     const ct = document.createElement('div'); ct.className = 'ct';
-    ct.innerHTML = moved ? `<small>開始時</small> ${moved}<small>位</small>` : '';
+    ct.innerHTML = r0 ? `<small>開始時</small> ${r0}<small>位</small>` : '<small>開始時 圏外</small>';
     row.append(rk, sw, jacketEl(x.s.j), nm, ct);
     lg.appendChild(row);
   });
   box.appendChild(lg);
   if (trendFrom) document.getElementById('rk-help').textContent =
-    `${need}曲が出揃った ${trendFrom.getMonth() + 1}/${trendFrom.getDate()} ${trendFrom.getHours()}時ごろからの、いまの上位16曲の順位の動き（上ほど上位）。下の一覧の行を押すとその曲だけ目立ちます`;
+    `順位が落ち着いた ${trendFrom.getMonth() + 1}/${trendFrom.getDate()} ${trendFrom.getHours()}時ごろからの、いまの上位16曲の順位の動き（上ほど上位・${TREND_CAP}位より下は圏外）。下の一覧の行を押すとその曲だけ目立ちます`;
 }
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件` + (rkExtra ? `（うちNMB48楽曲ソート ${rkExtra}件）` : '');
