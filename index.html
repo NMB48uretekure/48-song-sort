@@ -56,7 +56,7 @@
   .rk-order .chip { font-size: 12px; }
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
   .listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px 10px; border-radius: 999px;
-    font-size: 11px; font-weight: bold; text-decoration: none; color: #fff; background: linear-gradient(135deg, #fa5c78, #f94c57); }
+    font-size: 11px; font-weight: bold; text-decoration: none; color: #fff; background: #e62117; }
   .listen:active { opacity: .7; }
   .resume-box { border: 2px solid var(--main); }
   .resume-msg { font-weight: bold; margin: 0 0 4px; }
@@ -725,11 +725,11 @@ function setRankOrder(o) {
   document.querySelectorAll('[data-ord]').forEach(b => b.classList.toggle('on', b.dataset.ord === o));
   renderRanking();
 }
-// Apple Music で「曲名 グループ名」を検索して開く
+// YouTube で「曲名 グループ名」を検索して開く
 function listenLink(s) {
   const a = document.createElement('a');
   a.className = 'listen';
-  a.href = 'https://music.apple.com/jp/search?term=' + encodeURIComponent(dispName(s.t) + ' ' + s.a);
+  a.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(dispName(s.t) + ' ' + s.a);
   a.target = '_blank';
   a.rel = 'noopener';
   a.textContent = '♪ 聴いてみる';
