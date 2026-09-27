@@ -57,16 +57,36 @@
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
   .rk-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: #666; font-weight: normal; }
   .rk-stats b { color: #333; font-size: 13px; }
-  .srch-nav { display: flex; gap: 8px; margin: 0 0 8px; }
-  .srch-nav button { flex: 1; padding: 9px 6px; font-size: 13px; }
-  #rk-float { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 15;
-    padding: 12px 20px; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .song-open { display: inline; background: none; border: 0; padding: 0; margin: 0; font: inherit; font-weight: bold; font-size: 15px;
+    color: #333; text-align: left; cursor: pointer; line-height: 1.4; }
+  .song-open .more { display: inline-block; vertical-align: 1px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px;
+    color: var(--main-dark); background: var(--sub); border: 1px solid var(--line); white-space: nowrap; }
+  .song-open:active { opacity: .6; }
+  .rk-row .nm > small { display: block; }
+  #song-modal { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #song-modal.hidden { display: none !important; }
+  #song-modal .mbg { position: absolute; inset: 0; background: rgba(0,0,0,.45); animation: mfade .2s ease; }
+  #song-modal .mcard { position: relative; width: 100%; max-width: 440px; max-height: 84vh; overflow-y: auto; background: #fff;
+    border-radius: 20px; padding: 16px 16px 18px; text-align: left; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+  @keyframes mfade { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #song-modal .mbg { animation: none; } }
+  .mtop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 32px; }
+  .mtop button { padding: 6px 12px; font-size: 13px; background: var(--sub); color: var(--main-dark); }
+  .mtop .mclose { margin-left: auto; width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 34px; }
+  .mhead { display: flex; gap: 14px; align-items: center; }
+  .mhead .jk, .mhead .jk-ph { width: 96px; height: 96px; border-radius: 12px; font-size: 16px; }
+  .mhead .mt { font-size: 18px; font-weight: bold; line-height: 1.35; word-break: break-word; }
+  .mhead small { display: block; color: #999; font-size: 12px; margin-top: 4px; line-height: 1.4; }
+  .mstats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0 12px; }
+  .mstats div { background: var(--bg); border-radius: 10px; padding: 8px 4px; text-align: center; font-size: 10px; color: #888; }
+  .mstats b { display: block; font-size: 18px; color: #333; font-variant-numeric: tabular-nums; }
+  .mstats b small { font-size: 10px; color: #999; font-weight: normal; }
   .also { margin-top: 8px; padding: 8px 10px; background: var(--sub); border-radius: 10px; }
   .also p { margin: 0 0 6px; font-size: 11px; font-weight: bold; color: var(--main-dark); }
   .also .chips { justify-content: flex-start; margin: 0; }
   .also .chip { font-size: 11px; padding: 4px 9px; text-align: left; }
   .also .chip small { font-weight: normal; opacity: .75; margin-left: 2px; }
-  .listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px 10px; border-radius: 999px;
+  .listen { display: flex; width: fit-content; align-items: center; gap: 4px; margin-top: 6px; padding: 4px 10px; border-radius: 999px;
     font-size: 11px; font-weight: bold; text-decoration: none; color: #fff; background: #e62117; }
   .listen:active { opacity: .7; }
   .resume-box { border: 2px solid var(--main); }
@@ -235,7 +255,7 @@
   <h2>みんなの人気曲ランキング</h2>
   <p class="desc" id="rk-total">読み込み中…</p>
   <div class="chips" id="rk-grp"></div>
-  <input class="search" id="rk-search" type="search" placeholder="曲名で検索（ランキングの曲をタップしても見られます）" oninput="renderRanking()">
+  <input class="search" id="rk-search" type="search" placeholder="曲名で検索" oninput="renderRanking()">
   <div class="tabs" id="rk-kind">
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
@@ -266,7 +286,7 @@
   AKB48グループ各グループおよび運営会社とは一切関係ありません。
 </footer>
 
-<button id="rk-float" class="hidden" onclick="rkBackToList()">← ランキングに戻る</button>
+<div id="song-modal" class="hidden" role="dialog" aria-modal="true"><div class="mbg" onclick="closeSongModal()"></div><div class="mcard" id="song-modal-card"></div></div>
 <div id="toast"></div>
 
 <script>
@@ -648,7 +668,7 @@ function openRanking() {
   buildRankGroups();
   loadRanking();
 }
-function closeRanking() { document.getElementById('rk-float').classList.add('hidden'); showPhase(1); window.scrollTo(0, 0); }
+function closeRanking() { modalStack = []; document.getElementById('song-modal').classList.add('hidden'); document.body.style.overflow = ''; showPhase(1); window.scrollTo(0, 0); }
 // 結果画面：自分の1位の曲がみんなのランキングで何位かを表示
 async function updateRankPromo() {
   const box = document.getElementById('rank-promo');
@@ -749,98 +769,161 @@ function listenLink(s) {
   return a;
 }
 // 検索した曲が何回選ばれたか（ポイント・1位・TOP16入り・順位ごとの回数）
-let rkHist = [], rkListScroll = 0;
-// 検索（詳細）を開く：ランキング一覧から開いたときは元の位置を覚えておく
-function rkOpenSong(title) {
-  const inp = document.getElementById('rk-search');
-  if (inp.value.trim()) rkHist.push(inp.value); else { rkHist = []; rkListScroll = window.scrollY; }
-  inp.value = title;
-  renderRanking();
-  inp.scrollIntoView({ block: 'start' });
+// 集計（全グループ共通）：曲ごとのポイント・1位・TOP16入り、ポイント順位、各曲が入っている投票
+let rkStatCache = null;
+function rkStats() {
+  if (rkStatCache && rkStatCache.rows === rkRows) return rkStatCache;
+  const byKey = new Map(SONGS.map(s => [songKey(s), s]));
+  const st = new Map(), rowsOf = new Map();
+  rkRows.forEach((r, ri) => r.forEach((k, i) => {
+    const s = byKey.get(k);
+    if (!s) return;
+    const x = st.get(s) || { pt: 0, first: 0, in: 0 };
+    x.pt += 16 - i; x.in++; if (i === 0) x.first++;
+    st.set(s, x);
+    if (!rowsOf.has(s)) rowsOf.set(s, []);
+    rowsOf.get(s).push(ri);
+  }));
+  const ptRank = new Map();
+  { const arr = [...st.entries()].sort((a, b) => b[1].pt - a[1].pt); let rank = 0, prev = null;
+    arr.forEach(([s, x], i) => { if (x.pt !== prev) { rank = i + 1; prev = x.pt; } ptRank.set(s, rank); }); }
+  rkStatCache = { rows: rkRows, byKey, st, rowsOf, ptRank, total: st.size };
+  return rkStatCache;
 }
-function rkBackOne() {
-  const inp = document.getElementById('rk-search');
-  inp.value = rkHist.pop() || '';
-  renderRanking();
-  if (inp.value) inp.scrollIntoView({ block: 'start' }); else window.scrollTo(0, rkListScroll);
+// 「この曲を選んだ人は、こんな曲も選んでいます」
+function alsoFor(s) {
+  const { byKey, rowsOf } = rkStats();
+  const mine = rowsOf.get(s) || [];
+  const co = new Map();
+  mine.forEach(ri => new Set(rkRows[ri]).forEach(k => { const t = byKey.get(k); if (t && t !== s) co.set(t, (co.get(t) || 0) + 1); }));
+  const minCo = mine.length >= 10 ? 2 : 1;   // 票が多い曲は、たまたま1回いっしょだった曲を外す
+  // 人気曲ばかり出ないよう、いっしょに選ばれた回数を相手の人気で割り引いて並べる
+  return [...co.entries()].filter(([, n]) => n >= minCo)
+    .map(([t, n]) => [t, n, n / Math.sqrt(mine.length * (rowsOf.get(t) || []).length)])
+    .sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, 6);
 }
-function rkBackToList() {
-  document.getElementById('rk-search').value = '';
-  rkHist = [];
-  renderRanking();
-  window.scrollTo(0, rkListScroll);
+// 曲名（押すと詳細ポップアップ）＋収録
+function songNameEl(s) {
+  const nm = document.createElement('div'); nm.className = 'nm';
+  const b = document.createElement('button'); b.className = 'song-open'; b.type = 'button';
+  b.appendChild(document.createTextNode(dispName(s.t)));
+  const more = document.createElement('span'); more.className = 'more'; more.textContent = '詳しく ›'; b.appendChild(more);
+  b.onclick = e => openSongModal(s, false, e);
+  nm.appendChild(b);
+  const sm = document.createElement('small'); sm.textContent = dispSrc(s.s); nm.appendChild(sm);
+  return nm;
 }
+// ---------- 曲の詳細ポップアップ ----------
+let modalStack = [], modalFrom = null;
+const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 押したボタンの位置からカードが「ポン」と出てくるアニメーション
+function popFrom(card, rect, reverse) {
+  if (!card.animate || reduceMotion()) return null;
+  const c = card.getBoundingClientRect();
+  let from = 'scale(.6)';
+  if (rect) {
+    const dx = (rect.left + rect.width / 2) - (c.left + c.width / 2);
+    const dy = (rect.top + rect.height / 2) - (c.top + c.height / 2);
+    from = `translate(${dx}px, ${dy}px) scale(.08)`;
+  }
+  const kf = [{ transform: from, opacity: 0 }, { transform: 'scale(1.03)', opacity: 1, offset: .75 }, { transform: 'none', opacity: 1 }];
+  return card.animate(reverse ? [{ transform: 'none', opacity: 1 }, { transform: from, opacity: 0 }] : kf,
+    { duration: reverse ? 180 : 280, easing: reverse ? 'ease-in' : 'cubic-bezier(.2,.9,.3,1.2)' });
+}
+function openSongModal(s, push, ev) {
+  const card = document.getElementById('song-modal-card');
+  if (push) {
+    modalStack.push(s);
+    renderSongModal();
+    if (card.animate && !reduceMotion()) card.animate([{ opacity: .3, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'ease-out' });
+    return;
+  }
+  modalStack = [s];
+  const btn = ev && ev.currentTarget;
+  modalFrom = btn && btn.isConnected ? btn : null;
+  renderSongModal();
+  document.getElementById('song-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  popFrom(card, modalFrom && modalFrom.getBoundingClientRect());
+}
+function closeSongModal() {
+  const m = document.getElementById('song-modal');
+  if (m.classList.contains('hidden')) return;
+  modalStack = [];
+  const done = () => { m.classList.add('hidden'); document.body.style.overflow = ''; };
+  const rect = modalFrom && modalFrom.isConnected ? modalFrom.getBoundingClientRect() : null;
+  const a = popFrom(document.getElementById('song-modal-card'), rect, true);
+  if (a) a.onfinish = done; else done();
+}
+function songModalBack() { modalStack.pop(); if (modalStack.length) renderSongModal(); else closeSongModal(); }
+function renderSongModal() {
+  const s = modalStack[modalStack.length - 1];
+  const { st, ptRank } = rkStats();
+  const x = st.get(s) || { pt: 0, first: 0, in: 0 };
+  const card = document.getElementById('song-modal-card');
+  card.innerHTML = '';
+  card.scrollTop = 0;
+  const top = document.createElement('div'); top.className = 'mtop';
+  if (modalStack.length > 1) { const bk = document.createElement('button'); bk.textContent = '← 前の曲'; bk.onclick = songModalBack; top.appendChild(bk); }
+  const cl = document.createElement('button'); cl.className = 'mclose'; cl.textContent = '✕'; cl.setAttribute('aria-label', '閉じる'); cl.onclick = closeSongModal;
+  top.appendChild(cl);
+  card.appendChild(top);
+  const head = document.createElement('div'); head.className = 'mhead';
+  head.appendChild(jacketEl(s.j));
+  const ht = document.createElement('div');
+  const t = document.createElement('div'); t.className = 'mt'; t.textContent = dispName(s.t); ht.appendChild(t);
+  const sm = document.createElement('small'); sm.textContent = dispSrc(s.s); ht.appendChild(sm);
+  ht.appendChild(listenLink(s));
+  head.appendChild(ht);
+  card.appendChild(head);
+  const stats = document.createElement('div'); stats.className = 'mstats';
+  const cell = (label, val, unit) => `<div><b>${val}<small>${unit}</small></b>${label}</div>`;
+  stats.innerHTML = cell('ポイント順位', ptRank.has(s) ? ptRank.get(s) : '−', ptRank.has(s) ? '位' : '')
+    + cell('ポイント', x.pt, '点') + cell('1位', x.first, '回') + cell('TOP16入り', x.in, '回');
+  card.appendChild(stats);
+  const also = x.in ? alsoFor(s) : [];
+  const w = document.createElement('div'); w.className = 'also';
+  const p = document.createElement('p'); p.textContent = 'この曲を選んだ人は、こんな曲も選んでいます'; w.appendChild(p);
+  if (also.length) {
+    const cs = document.createElement('div'); cs.className = 'chips';
+    also.forEach(([t2, n]) => {
+      const b = document.createElement('button'); b.className = 'chip';
+      b.textContent = dispName(t2.t);
+      const sm2 = document.createElement('small'); sm2.textContent = `${t2.a}・${n}人`; b.appendChild(sm2);
+      b.onclick = () => openSongModal(t2, true);
+      cs.appendChild(b);
+    });
+    w.appendChild(cs);
+  } else {
+    const e = document.createElement('p'); e.style.fontWeight = 'normal'; e.style.color = '#999'; e.style.margin = '0';
+    e.textContent = x.in ? 'まだデータが少ないので出せません' : 'まだ誰もTOP16に選んでいません';
+    w.appendChild(e);
+  }
+  card.appendChild(w);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSongModal(); });
+// 検索：曲名で絞った一覧（押すと詳細ポップアップ）
 function renderRankSearch(q, byKey) {
   const norm = t => t.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
   const nq = norm(q);
-  document.getElementById('rk-help').textContent = '検索した曲の選ばれた回数（上のグループでも絞れます）';
-  const pool = SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp);
-  const st = new Map(pool.map(s => [s, { pt: 0, first: 0, in: 0, pos: Array(16).fill(0) }]));
-  rkRows.forEach(r => r.forEach((k, i) => {
-    const x = st.get(byKey.get(k));
-    if (!x) return;
-    x.pt += 16 - i; x.in++; x.pos[i]++; if (i === 0) x.first++;
-  }));
-  // ポイント順位（全体の中で）
-  const ptRank = new Map();
-  { const arr = [...st.entries()].filter(([, x]) => x.pt).sort((a, b) => b[1].pt - a[1].pt); let rank = 0, prev = null;
-    arr.forEach(([s, x], i) => { if (x.pt !== prev) { rank = i + 1; prev = x.pt; } ptRank.set(s, rank); }); }
-  const hits = pool.filter(s => norm(dispName(s.t)).includes(nq) || norm(s.t).includes(nq))
-    .sort((a, b) => st.get(b).pt - st.get(a).pt);
+  document.getElementById('rk-help').textContent = '曲名を押すと詳しく見られます（上のグループでも絞れます）';
+  const { st, ptRank } = rkStats();
+  const hits = SONGS.filter(s => (rkGrp === 'all' || s.a === rkGrp) && (norm(dispName(s.t)).includes(nq) || norm(s.t).includes(nq)))
+    .sort((a, b) => ((st.get(b) || {}).pt || 0) - ((st.get(a) || {}).pt || 0));
   const box = document.getElementById('rk-list');
-  box.innerHTML = '';
-  const nav = document.createElement('div'); nav.className = 'srch-nav';
-  if (rkHist.length) { const b1 = document.createElement('button'); b1.className = 'btn-light'; b1.textContent = '← 前の曲に戻る'; b1.onclick = rkBackOne; nav.appendChild(b1); }
-  const b2 = document.createElement('button'); b2.className = 'btn-light'; b2.textContent = '✕ ランキングに戻る'; b2.onclick = rkBackToList; nav.appendChild(b2);
-  box.appendChild(nav);
-  if (!hits.length) box.insertAdjacentHTML('beforeend', '<p class="empty-msg">見つかりませんでした</p>');
+  box.innerHTML = hits.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
   if (hits.length) { const p = document.createElement('p'); p.className = 'help'; p.style.margin = '0 0 4px'; p.textContent = `${hits.length}曲`; box.appendChild(p); }
-  // 「この曲を選んだ人は、こんな曲も選んでいます」用：曲ごとに、その曲が入っている投票の番号
-  const rowsOf = new Map();
-  rkRows.forEach((r, ri) => r.forEach(k => { const t = byKey.get(k); if (t) { if (!rowsOf.has(t)) rowsOf.set(t, []); rowsOf.get(t).push(ri); } }));
-  const alsoFor = s => {
-    const mine = rowsOf.get(s) || [];
-    const co = new Map();
-    mine.forEach(ri => new Set(rkRows[ri]).forEach(k => { const t = byKey.get(k); if (t && t !== s) co.set(t, (co.get(t) || 0) + 1); }));
-    const minCo = mine.length >= 10 ? 2 : 1;   // 票が多い曲は、たまたま1回いっしょだった曲を外す
-    // 人気曲ばかり出ないよう、いっしょに選ばれた回数を相手の人気（TOP16入り回数）で割り引いて並べる
-    return [...co.entries()].filter(([t, n]) => n >= minCo)
-      .map(([t, n]) => [t, n, n / Math.sqrt(mine.length * (rowsOf.get(t) || []).length)])
-      .sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, 6);
-  };
-  hits.slice(0, 100).forEach((s, hi) => {
-    const x = st.get(s);
+  hits.slice(0, 100).forEach(s => {
+    const x = st.get(s) || { pt: 0, first: 0, in: 0 };
     const row = document.createElement('div'); row.className = 'rk-row';
     const rk = document.createElement('div'); rk.className = 'rk';
     if (ptRank.has(s)) rk.textContent = ptRank.get(s); else { rk.classList.add('none'); rk.textContent = '−'; }
-    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = dispName(s.t);
-    const sm = document.createElement('small'); sm.textContent = dispSrc(s.s); nm.appendChild(sm);
+    const nm = songNameEl(s);
     const stats = document.createElement('div'); stats.className = 'rk-stats';
-    stats.innerHTML = `<span>ポイント <b>${x.pt}</b>点</span><span>1位 <b>${x.first}</b>回</span><span>TOP16入り <b>${x.in}</b>回</span>`;
+    stats.innerHTML = `<span>1位 <b>${x.first}</b>回</span><span>TOP16入り <b>${x.in}</b>回</span>`;
     nm.appendChild(stats);
-    if (x.in) {
-      const pos = document.createElement('div'); pos.className = 'rk-stats';
-      pos.textContent = x.pos.map((n, i) => n ? `${i + 1}位×${n}` : '').filter(Boolean).join(' ・ ');
-      nm.appendChild(pos);
-    }
     nm.appendChild(listenLink(s));
-    if (x.in && hi < 10) {
-      const also = alsoFor(s);
-      if (also.length) {
-        const w = document.createElement('div'); w.className = 'also';
-        const p = document.createElement('p'); p.textContent = 'この曲を選んだ人は、こんな曲も選んでいます'; w.appendChild(p);
-        const cs = document.createElement('div'); cs.className = 'chips';
-        also.forEach(([t, n]) => {
-          const b = document.createElement('button'); b.className = 'chip';
-          b.textContent = dispName(t.t);
-          const sm2 = document.createElement('small'); sm2.textContent = `${t.a}・${n}人`; b.appendChild(sm2);
-          b.onclick = () => rkOpenSong(dispName(t.t));
-          cs.appendChild(b);
-        });
-        w.appendChild(cs); nm.appendChild(w);
-      }
-    }
-    const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${x.in}<small>回</small>`;
+    const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${x.pt}<small>点</small>`;
     row.append(rk, jacketEl(s.j), nm, ct);
     box.appendChild(row);
   });
@@ -858,8 +941,6 @@ function renderRanking() {
   const q = (document.getElementById('rk-search').value || '').trim();
   document.getElementById('rk-kind').classList.toggle('hidden', !!q);
   document.getElementById('rk-order').classList.toggle('hidden', !!q || rkKind === 'zero');
-  document.getElementById('rk-float').classList.toggle('hidden', !q || document.getElementById('phase4').classList.contains('hidden'));
-  if (!q) rkHist = [];
   if (q) { renderRankSearch(q, byKey); return; }
   const pool = SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp);
   const inPool = new Set(pool);
@@ -901,18 +982,12 @@ function renderRanking() {
     row.className = 'rk-row';
     const rk = document.createElement('div'); rk.className = 'rk';
     if (rkKind === 'zero') { rk.classList.add('none'); rk.textContent = '−'; } else rk.textContent = rankOf.get(s);
-    const nm = document.createElement('div'); nm.className = 'nm';
-    nm.textContent = dispName(s.t);
-    const sm = document.createElement('small'); sm.textContent = dispSrc(s.s); nm.appendChild(sm);
+    const nm = songNameEl(s);
     if (v) {
       const bar = document.createElement('div'); bar.className = 'rk-bar';
       bar.style.width = Math.max(4, v / max * 100) + '%'; bar.style.background = GCOLOR[s.a];
       nm.appendChild(bar);
     }
-    nm.style.cursor = 'pointer';
-    nm.title = 'タップで詳しく見る';
-    nm.onclick = e => { if (e.target.closest('a')) return; rkOpenSong(dispName(s.t)); };
-    nm.appendChild(document.createElement('br'));
     nm.appendChild(listenLink(s));
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${v}<small>${unit}</small>`;
     row.append(rk, jacketEl(s.j), nm, ct);
