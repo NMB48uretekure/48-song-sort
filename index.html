@@ -983,23 +983,35 @@ function parseStamp(t) {
 // 8色×（実線・点線）で16曲を区別する
 const TREND_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
 const TREND_N = 16;
-let trendFocus = null;
+let trendFocus = null, trendFrom = null;
 function renderTrend(byKey) {
   const box = document.getElementById('rk-list');
   box.innerHTML = '';
   const pool = new Set(SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp));
   const ev = rkRows.map((r, i) => [rkTimes[i], r]).filter(([t]) => t).sort((a, b) => a[0] - b[0]);
   if (ev.length < 2) { box.innerHTML = '<p class="empty-msg">まだデータが足りません</p>'; return; }
+  // 開始時刻：ランキングに200曲が出揃った時点から（グループで絞って200曲に届かないときは、最終的に出てくる曲数まで）
+  const everPts = new Set();
+  ev.forEach(([, r]) => r.forEach(k => { const s = byKey.get(k); if (s && pool.has(s)) everPts.add(s); }));
+  const need = Math.min(200, everPts.size);
+  let startIdx = 0;
+  { const seen = new Set();
+    for (let n = 0; n < ev.length; n++) {
+      ev[n][1].forEach(k => { const s = byKey.get(k); if (s && pool.has(s)) seen.add(s); });
+      if (seen.size >= need) { startIdx = n; break; }
+    } }
+  trendFrom = ev[startIdx][0];
   // 区切りの時刻：全体を12前後に分ける（1・2・3・6・12時間、1日単位）
-  const t0 = ev[0][0].getTime(), t1 = ev[ev.length - 1][0].getTime();
+  const t0 = ev[startIdx][0].getTime(), t1 = ev[ev.length - 1][0].getTime();
   const H = 3600e3, span = Math.max(t1 - t0, H);
   const step = [1, 2, 3, 6, 12, 24, 48, 72, 168].map(h => h * H).find(x => span / x <= 12) || 168 * H;
   const start = new Date(t0); start.setMinutes(0, 0, 0);
   if (step >= 24 * H) start.setHours(0);
   else start.setHours(Math.floor(start.getHours() / (step / H)) * (step / H));
   const cps = [];
-  for (let t = start.getTime() + step; t < t1; t += step) cps.push(t);
-  cps.push(t1);
+  cps.push(t0);
+  for (let t = start.getTime() + step; t < t1; t += step) if (t > t0) cps.push(t);
+  if (t1 > t0) cps.push(t1);
   // 区切りごとの累計ポイント → 順位
   const pts = new Map(), snaps = [];
   let e = 0;
@@ -1094,11 +1106,13 @@ function renderTrend(byKey) {
     const nm = songNameEl(x.s);
     const moved = x.ranks.find(Boolean);
     const ct = document.createElement('div'); ct.className = 'ct';
-    ct.innerHTML = moved ? `<small>初登場</small> ${moved}<small>位</small>` : '';
+    ct.innerHTML = moved ? `<small>開始時</small> ${moved}<small>位</small>` : '';
     row.append(rk, sw, jacketEl(x.s.j), nm, ct);
     lg.appendChild(row);
   });
   box.appendChild(lg);
+  if (trendFrom) document.getElementById('rk-help').textContent =
+    `${need}曲が出揃った ${trendFrom.getMonth() + 1}/${trendFrom.getDate()} ${trendFrom.getHours()}時ごろからの、いまの上位16曲の順位の動き（上ほど上位）。下の一覧の行を押すとその曲だけ目立ちます`;
 }
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件` + (rkExtra ? `（うちNMB48楽曲ソート ${rkExtra}件）` : '');
