@@ -161,6 +161,10 @@
   .battle-card .t { font-size: 18px; font-weight: bold; line-height: 1.4; word-break: break-word; }
   .battle-card .s { font-size: 11px; color: #999; margin-top: 10px; line-height: 1.4; }
   .jwrap { width: 100%; display: flex; justify-content: center; }
+  #progress-desc .left { color: var(--main-dark); }
+  #progress-desc .left b { font-size: 16px; }
+  .prog { height: 6px; border-radius: 3px; background: var(--sub); overflow: hidden; margin: 2px 0 0; }
+  .prog i { display: block; height: 100%; width: 0; background: var(--main); transition: width .25s; }
   .vs-text { align-self: center; font-size: 18px; font-weight: bold; color: var(--main); }
   .draw-btn { margin: 4px auto 12px; font-size: 15px; }
 
@@ -222,6 +226,7 @@
 <div id="phase2" class="step-container hidden">
   <h2>どっちの曲が好き？</h2>
   <p class="desc" id="progress-desc"></p>
+  <div class="prog"><i id="progress-fill"></i></div>
   <div class="battle-container">
     <div class="battle-card" onclick="selectWinner(0)"><div class="jwrap" id="f0-j"></div><div class="t" id="f0-t"></div><div class="s" id="f0-s"></div></div>
     <div class="vs-text">VS</div>
@@ -1226,6 +1231,27 @@ function processNextPair() {
   nextMergeStep();
 }
 
+// 残りの対戦数（最大）：今の組の残り＋この先の組み合わせで起こりうる最大の回数
+function remainingMax() {
+  let total = 0;
+  const lens = sortQueues.map(q => q.length);
+  parentQueue.forEach(p => {
+    const l = p.left.length, r = p.right.length, m = p.merged.length;
+    if (l && r && m < TOP_N) total += Math.min(l + r - 1, TOP_N - m);
+    lens.push(Math.min(l + r + m, TOP_N));
+  });
+  let cur = lens;
+  while (cur.length > 1) {
+    const next = [];
+    for (let i = 0; i < cur.length; i += 2) {
+      const a = cur[i], b = cur[i + 1] || 0;
+      if (a && b) total += Math.min(a + b - 1, TOP_N);
+      next.push(Math.min(a + b, TOP_N));
+    }
+    cur = next;
+  }
+  return total;
+}
 function renderBattle(a, b) {
   [[a, 'f0-j'], [b, 'f1-j']].forEach(([s, id]) => {
     const box = document.getElementById(id);
@@ -1236,7 +1262,10 @@ function renderBattle(a, b) {
   document.getElementById('f0-s').textContent = dispSrc(a.s);
   document.getElementById('f1-t').textContent = dispName(b.t);
   document.getElementById('f1-s').textContent = dispSrc(b.s);
-  document.getElementById('progress-desc').textContent = `第${battleCount + 1}戦`;
+  const left = remainingMax();
+  document.getElementById('progress-desc').innerHTML = `第${battleCount + 1}戦　<span class="left">あと最大 <b>${left}</b> 戦</span>`;
+  const done = battleCount / (battleCount + left);
+  document.getElementById('progress-fill').style.width = Math.round(done * 100) + '%';
   document.getElementById('undo-btn').disabled = undoStack.length === 0;
   saveProgress();
 }
