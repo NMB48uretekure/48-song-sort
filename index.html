@@ -55,6 +55,8 @@
   .rk-order { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
   .rk-order .chip { font-size: 12px; }
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
+  .rk-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: #666; font-weight: normal; }
+  .rk-stats b { color: #333; font-size: 13px; }
   .listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px 10px; border-radius: 999px;
     font-size: 11px; font-weight: bold; text-decoration: none; color: #fff; background: #e62117; }
   .listen:active { opacity: .7; }
@@ -224,6 +226,7 @@
   <h2>みんなの人気曲ランキング</h2>
   <p class="desc" id="rk-total">読み込み中…</p>
   <div class="chips" id="rk-grp"></div>
+  <input class="search" id="rk-search" type="search" placeholder="曲名で検索して選ばれた回数を見る" oninput="renderRanking()">
   <div class="tabs" id="rk-kind">
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
@@ -735,6 +738,48 @@ function listenLink(s) {
   a.textContent = '♪ 聴いてみる';
   return a;
 }
+// 検索した曲が何回選ばれたか（ポイント・1位・TOP16入り・順位ごとの回数）
+function renderRankSearch(q, byKey) {
+  const norm = t => t.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  const nq = norm(q);
+  document.getElementById('rk-help').textContent = '検索した曲の選ばれた回数（上のグループでも絞れます）';
+  const pool = SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp);
+  const st = new Map(pool.map(s => [s, { pt: 0, first: 0, in: 0, pos: Array(16).fill(0) }]));
+  rkRows.forEach(r => r.forEach((k, i) => {
+    const x = st.get(byKey.get(k));
+    if (!x) return;
+    x.pt += 16 - i; x.in++; x.pos[i]++; if (i === 0) x.first++;
+  }));
+  // ポイント順位（全体の中で）
+  const ptRank = new Map();
+  { const arr = [...st.entries()].filter(([, x]) => x.pt).sort((a, b) => b[1].pt - a[1].pt); let rank = 0, prev = null;
+    arr.forEach(([s, x], i) => { if (x.pt !== prev) { rank = i + 1; prev = x.pt; } ptRank.set(s, rank); }); }
+  const hits = pool.filter(s => norm(dispName(s.t)).includes(nq) || norm(s.t).includes(nq))
+    .sort((a, b) => st.get(b).pt - st.get(a).pt);
+  const box = document.getElementById('rk-list');
+  box.innerHTML = hits.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
+  if (hits.length) { const p = document.createElement('p'); p.className = 'help'; p.style.margin = '0 0 4px'; p.textContent = `${hits.length}曲`; box.appendChild(p); }
+  hits.slice(0, 100).forEach(s => {
+    const x = st.get(s);
+    const row = document.createElement('div'); row.className = 'rk-row';
+    const rk = document.createElement('div'); rk.className = 'rk';
+    if (ptRank.has(s)) rk.textContent = ptRank.get(s); else { rk.classList.add('none'); rk.textContent = '−'; }
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = dispName(s.t);
+    const sm = document.createElement('small'); sm.textContent = dispSrc(s.s); nm.appendChild(sm);
+    const stats = document.createElement('div'); stats.className = 'rk-stats';
+    stats.innerHTML = `<span>ポイント <b>${x.pt}</b>点</span><span>1位 <b>${x.first}</b>回</span><span>TOP16入り <b>${x.in}</b>回</span>`;
+    nm.appendChild(stats);
+    if (x.in) {
+      const pos = document.createElement('div'); pos.className = 'rk-stats';
+      pos.textContent = x.pos.map((n, i) => n ? `${i + 1}位×${n}` : '').filter(Boolean).join(' ・ ');
+      nm.appendChild(pos);
+    }
+    nm.appendChild(listenLink(s));
+    const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${x.in}<small>回</small>`;
+    row.append(rk, jacketEl(s.j), nm, ct);
+    box.appendChild(row);
+  });
+}
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件` + (rkExtra ? `（うちNMB48楽曲ソート ${rkExtra}件）` : '');
   document.getElementById('rk-help').textContent = {
@@ -744,8 +789,11 @@ function renderRanking() {
     low: 'TOP16に入った回数が1〜10回の曲',
     zero: 'まだ一度もTOP16に入っていない曲（発売順）',
   }[rkKind];
-  document.getElementById('rk-order').classList.toggle('hidden', rkKind === 'zero');
   const byKey = new Map(SONGS.map(s => [songKey(s), s]));
+  const q = (document.getElementById('rk-search').value || '').trim();
+  document.getElementById('rk-kind').classList.toggle('hidden', !!q);
+  document.getElementById('rk-order').classList.toggle('hidden', !!q || rkKind === 'zero');
+  if (q) { renderRankSearch(q, byKey); return; }
   const pool = SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp);
   const inPool = new Set(pool);
   // 数える（low / zero は TOP16入りの回数で判定）
