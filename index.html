@@ -55,6 +55,18 @@
   .rk-order { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
   .rk-order .chip { font-size: 12px; }
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
+  .trend { position: relative; margin: 4px 0 10px; }
+  .trend svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+  .trend .ax { font-size: 10px; fill: #999; font-variant-numeric: tabular-nums; }
+  .trend .grid { stroke: #f1e3e9; stroke-width: 1; }
+  .trend .tip { position: absolute; top: 0; pointer-events: none; background: rgba(255,255,255,.97); border: 1px solid var(--line);
+    border-radius: 10px; padding: 6px 9px; font-size: 11px; line-height: 1.55; text-align: left; box-shadow: 0 3px 10px rgba(0,0,0,.12); white-space: nowrap; }
+  .trend .tip b { font-size: 12px; }
+  .trend .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  .tlegend { text-align: left; }
+  .tlegend .rk-row .sw { width: 18px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+  .tlegend .tl-row { cursor: pointer; border-radius: 10px; }
+  .tlegend .tl-row.on { background: var(--sub); }
   .rk-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: #666; font-weight: normal; }
   .rk-stats b { color: #333; font-size: 13px; }
   .song-open { display: inline; background: none; border: 0; padding: 0; margin: 0; font: inherit; font-weight: bold; font-size: 15px;
@@ -273,8 +285,9 @@
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
     <button class="tab" data-rk="in" onclick="setRankKind('in')">TOP16入り</button>
-    <button class="tab wide" data-rk="low" onclick="setRankKind('low')">まだ10回以下の曲</button>
-    <button class="tab wide" data-rk="zero" onclick="setRankKind('zero')">まだ0回の曲</button>
+    <button class="tab" data-rk="trend" onclick="setRankKind('trend')">順位の推移</button>
+    <button class="tab" data-rk="low" onclick="setRankKind('low')">10回以下の曲</button>
+    <button class="tab" data-rk="zero" onclick="setRankKind('zero')">0回の曲</button>
   </div>
   <div class="rk-order" id="rk-order">
     <button class="chip on" data-ord="desc" onclick="setRankOrder('desc')">降順（多い順）</button>
@@ -656,7 +669,7 @@ function sendResult(list) {
   } catch (e) {}
 }
 
-let rkRows = [], rkExtra = 0, rkKind = 'point', rkOrder = 'desc', rkGrp = 'all';
+let rkRows = [], rkTimes = [], rkExtra = 0, rkKind = 'point', rkOrder = 'desc', rkGrp = 'all';
 function parseCSV(text) {
   const rows = []; let row = [], cur = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -735,6 +748,10 @@ async function loadRanking() {
     const head = rows.shift() || [];
     const idx = Array.from({ length: 16 }, (_, k) => head.findIndex(c => c.trim() === (k + 1) + '位'));
     rkRows = rows.map(r => idx.map(i => (i >= 0 ? (r[i] || '').trim() : '')));
+    // 投票した日時（順位の推移グラフ用）
+    let iTime = head.findIndex(c => c.includes('タイムスタンプ'));
+    if (iTime < 0) iTime = 0;
+    rkTimes = rows.map(r => parseStamp(r[iTime] || ''));
     rkExtra = 0;
     // 別のソートの結果も合算（読み込めなくても本体のランキングは出す）
     for (const src of (STATS.extra || [])) {
@@ -958,6 +975,131 @@ function renderRankSearch(q, byKey) {
     box.appendChild(row);
   });
 }
+function parseStamp(t) {
+  const m = t.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})[ T]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+  return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) : null;
+}
+// ---------- 順位の推移（折れ線グラフ） ----------
+// 8色×（実線・点線）で16曲を区別する
+const TREND_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const TREND_N = 16;
+let trendFocus = null;
+function renderTrend(byKey) {
+  const box = document.getElementById('rk-list');
+  box.innerHTML = '';
+  const pool = new Set(SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp));
+  const ev = rkRows.map((r, i) => [rkTimes[i], r]).filter(([t]) => t).sort((a, b) => a[0] - b[0]);
+  if (ev.length < 2) { box.innerHTML = '<p class="empty-msg">まだデータが足りません</p>'; return; }
+  // 区切りの時刻：全体を12前後に分ける（1・2・3・6・12時間、1日単位）
+  const t0 = ev[0][0].getTime(), t1 = ev[ev.length - 1][0].getTime();
+  const H = 3600e3, span = Math.max(t1 - t0, H);
+  const step = [1, 2, 3, 6, 12, 24, 48, 72, 168].map(h => h * H).find(x => span / x <= 12) || 168 * H;
+  const start = new Date(t0); start.setMinutes(0, 0, 0);
+  if (step >= 24 * H) start.setHours(0);
+  else start.setHours(Math.floor(start.getHours() / (step / H)) * (step / H));
+  const cps = [];
+  for (let t = start.getTime() + step; t < t1; t += step) cps.push(t);
+  cps.push(t1);
+  // 区切りごとの累計ポイント → 順位
+  const pts = new Map(), snaps = [];
+  let e = 0;
+  cps.forEach(cp => {
+    while (e < ev.length && ev[e][0].getTime() <= cp) {
+      ev[e][1].forEach((k, i) => { const s = byKey.get(k); if (s && pool.has(s)) pts.set(s, (pts.get(s) || 0) + 16 - i); });
+      e++;
+    }
+    const arr = [...pts.entries()].sort((a, b) => b[1] - a[1]);
+    const rank = new Map(); let r = 0, prev = null;
+    arr.forEach(([s, v], i) => { if (v !== prev) { r = i + 1; prev = v; } rank.set(s, r); });
+    snaps.push(rank);
+  });
+  const last = snaps[snaps.length - 1];
+  const top = [...last.entries()].sort((a, b) => a[1] - b[1]).slice(0, TREND_N).map(([s]) => s);
+  if (!top.length) { box.innerHTML = '<p class="empty-msg">まだデータがありません</p>'; return; }
+  const series = top.map((s, k) => ({ s, color: TREND_COLORS[k % 8], dash: k >= 8, ranks: snaps.map(m => m.get(s) || null) }));
+  if (trendFocus && !top.includes(trendFocus)) trendFocus = null;
+  // 描画
+  const W = 340, Ht = 300, L = 30, R = 12, T = 12, B = 30;
+  const maxRank = Math.max(16, ...series.flatMap(x => x.ranks.filter(Boolean)));
+  const X = i => L + (cps.length === 1 ? 0 : i / (cps.length - 1)) * (W - L - R);
+  const Y = r => T + (r - 1) / (maxRank - 1) * (Ht - T - B);
+  const fmt = t => { const d = new Date(t); return step >= 24 * H ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}時`; };
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (n, a) => { const x = document.createElementNS(NS, n); for (const k in a) x.setAttribute(k, a[k]); return x; };
+  const wrap = document.createElement('div'); wrap.className = 'trend';
+  const svg = el('svg', { viewBox: `0 0 ${W} ${Ht}`, role: 'img', 'aria-label': '順位の推移' });
+  const yt = [...new Set([1, Math.round(maxRank / 4), Math.round(maxRank / 2), Math.round(maxRank * 3 / 4), maxRank])].filter(v => v >= 1);
+  yt.forEach(v => {
+    svg.appendChild(el('line', { class: 'grid', x1: L, x2: W - R, y1: Y(v), y2: Y(v) }));
+    const tx = el('text', { class: 'ax', x: L - 6, y: Y(v) + 3.5, 'text-anchor': 'end' }); tx.textContent = v + '位'; svg.appendChild(tx);
+  });
+  const xi = [...new Set([0, Math.floor((cps.length - 1) / 2), cps.length - 1])];
+  xi.forEach((i, n) => {
+    const tx = el('text', { class: 'ax', x: X(i), y: Ht - 8, 'text-anchor': n === 0 ? 'start' : n === xi.length - 1 ? 'end' : 'middle' });
+    tx.textContent = fmt(cps[i]); svg.appendChild(tx);
+  });
+  const cross = el('line', { x1: 0, x2: 0, y1: T - 4, y2: Ht - B + 4, stroke: '#bbb', 'stroke-width': 1, 'stroke-dasharray': '3 3', visibility: 'hidden' });
+  svg.appendChild(cross);
+  // 下位の線から描いて、1位の線が一番上に来るように
+  series.slice().reverse().forEach(x => {
+    let d = '', pen = false;
+    x.ranks.forEach((r, i) => { if (r) { d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(r).toFixed(1) + ' '; pen = true; } else pen = false; });
+    const dim = trendFocus && trendFocus !== x.s;
+    const on = trendFocus === x.s;
+    const path = el('path', { d, fill: 'none', stroke: x.color, 'stroke-width': on ? 3.5 : 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: dim ? .15 : 1 });
+    if (x.dash) path.setAttribute('stroke-dasharray', '5 4');
+    svg.appendChild(path);
+    const li = x.ranks.length - 1;
+    if (x.ranks[li]) svg.appendChild(el('circle', { cx: X(li), cy: Y(x.ranks[li]), r: on ? 5 : 3.5, fill: x.color, stroke: '#fff', 'stroke-width': 2, opacity: dim ? .15 : 1 }));
+  });
+  if (trendFocus) { const fx = series.find(x => x.s === trendFocus); const ps = svg.querySelectorAll('path'); ps.forEach(pth => { if (pth.getAttribute('stroke') === fx.color && pth.getAttribute('opacity') === '1') svg.appendChild(pth); }); }
+  const dots = series.map(x => { const c = el('circle', { r: 4, fill: x.color, stroke: '#fff', 'stroke-width': 2, visibility: 'hidden' }); svg.appendChild(c); return c; });
+  const hit = el('rect', { x: L, y: 0, width: W - L - R, height: Ht, fill: 'transparent' });
+  svg.appendChild(hit);
+  wrap.appendChild(svg);
+  const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; wrap.appendChild(tip);
+  const show = evt => {
+    const rc = svg.getBoundingClientRect();
+    const vx = (evt.clientX - rc.left) / rc.width * W;
+    const i = Math.max(0, Math.min(cps.length - 1, Math.round((vx - L) / (W - L - R) * (cps.length - 1))));
+    cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('visibility', 'visible');
+    series.forEach((x, k) => { const r = x.ranks[i]; dots[k].setAttribute('visibility', r && (!trendFocus || x.s === trendFocus) ? 'visible' : 'hidden'); if (r) { dots[k].setAttribute('cx', X(i)); dots[k].setAttribute('cy', Y(r)); } });
+    tip.innerHTML = '';
+    const h = document.createElement('b'); h.textContent = fmt(cps[i]) + ' 時点'; tip.appendChild(h);
+    series.filter(x => !trendFocus || x.s === trendFocus).sort((a, b) => (a.ranks[i] || 1e9) - (b.ranks[i] || 1e9)).forEach(x => {
+      const row = document.createElement('div');
+      const sw = document.createElement('i'); sw.style.background = x.dash ? `repeating-linear-gradient(90deg, ${x.color} 0 4px, transparent 4px 6px)` : x.color;
+      row.append(sw, `${x.ranks[i] ? x.ranks[i] + '位' : '圏外'}　${dispName(x.s.t)}`);
+      tip.appendChild(row);
+    });
+    tip.hidden = false;
+    const px = X(i) / W * rc.width;
+    tip.style.left = Math.max(0, Math.min(rc.width - tip.offsetWidth, px < rc.width / 2 ? px + 10 : px - tip.offsetWidth - 10)) + 'px';
+  };
+  const hide = () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); dots.forEach(d => d.setAttribute('visibility', 'hidden')); };
+  hit.addEventListener('pointermove', show);
+  hit.addEventListener('pointerdown', show);
+  hit.addEventListener('pointerleave', hide);
+  box.appendChild(wrap);
+  // 凡例（色だけで区別しないよう、曲名と今の順位を必ず出す）
+  const lg = document.createElement('div'); lg.className = 'tlegend';
+  series.forEach(x => {
+    const row = document.createElement('div'); row.className = 'rk-row';
+    const rk = document.createElement('div'); rk.className = 'rk'; rk.textContent = last.get(x.s);
+    const sw = document.createElement('span'); sw.className = 'sw';
+    sw.style.background = x.dash ? `repeating-linear-gradient(90deg, ${x.color} 0 5px, transparent 5px 8px)` : x.color;
+    // 行（曲名以外）を押すと、その曲の線だけ目立たせる。もう一度押すと元に戻る
+    row.classList.add('tl-row'); if (trendFocus === x.s) row.classList.add('on');
+    row.onclick = e => { if (e.target.closest('button, a')) return; trendFocus = trendFocus === x.s ? null : x.s; renderRanking(); };
+    const nm = songNameEl(x.s);
+    const moved = x.ranks.find(Boolean);
+    const ct = document.createElement('div'); ct.className = 'ct';
+    ct.innerHTML = moved ? `<small>初登場</small> ${moved}<small>位</small>` : '';
+    row.append(rk, sw, jacketEl(x.s.j), nm, ct);
+    lg.appendChild(row);
+  });
+  box.appendChild(lg);
+}
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件` + (rkExtra ? `（うちNMB48楽曲ソート ${rkExtra}件）` : '');
   document.getElementById('rk-help').textContent = {
@@ -966,12 +1108,14 @@ function renderRanking() {
     in: 'TOP16（1〜16位）に入った回数',
     low: 'TOP16に入った回数が1〜10回の曲',
     zero: 'まだ一度もTOP16に入っていない曲（発売順）',
+    trend: 'いまのポイント上位16曲の順位の動き（上ほど上位）。下の一覧の行を押すとその曲だけ目立ちます',
   }[rkKind];
   const byKey = new Map(SONGS.map(s => [songKey(s), s]));
   const q = (document.getElementById('rk-search').value || '').trim();
   document.getElementById('rk-kind').classList.toggle('hidden', !!q);
   document.getElementById('rk-order').classList.toggle('hidden', !!q || rkKind === 'zero');
   if (q) { renderRankSearch(q, byKey); return; }
+  if (rkKind === 'trend') { document.getElementById('rk-order').classList.add('hidden'); renderTrend(byKey); return; }
   const pool = SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp);
   const inPool = new Set(pool);
   // 数える（low / zero は TOP16入りの回数で判定）
