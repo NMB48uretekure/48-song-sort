@@ -55,6 +55,9 @@
   .rk-order { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
   .rk-order .chip { font-size: 12px; }
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
+  .listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: bold; text-decoration: none; color: #fff; background: linear-gradient(135deg, #fa5c78, #f94c57); }
+  .listen:active { opacity: .7; }
   .resume-box { border: 2px solid var(--main); }
   .resume-msg { font-weight: bold; margin: 0 0 4px; }
   .rank-promo { margin: 22px 0 6px; padding: 16px 12px 16px; border-radius: 16px; color: #fff;
@@ -722,6 +725,16 @@ function setRankOrder(o) {
   document.querySelectorAll('[data-ord]').forEach(b => b.classList.toggle('on', b.dataset.ord === o));
   renderRanking();
 }
+// Apple Music で「曲名 グループ名」を検索して開く
+function listenLink(s) {
+  const a = document.createElement('a');
+  a.className = 'listen';
+  a.href = 'https://music.apple.com/jp/search?term=' + encodeURIComponent(dispName(s.t) + ' ' + s.a);
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = '♪ 聴いてみる';
+  return a;
+}
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件` + (rkExtra ? `（うちNMB48楽曲ソート ${rkExtra}件）` : '');
   document.getElementById('rk-help').textContent = {
@@ -781,6 +794,8 @@ function renderRanking() {
       bar.style.width = Math.max(4, v / max * 100) + '%'; bar.style.background = GCOLOR[s.a];
       nm.appendChild(bar);
     }
+    nm.appendChild(document.createElement('br'));
+    nm.appendChild(listenLink(s));
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${v}<small>${unit}</small>`;
     row.append(rk, jacketEl(s.j), nm, ct);
     box.appendChild(row);
