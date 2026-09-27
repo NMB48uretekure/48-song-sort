@@ -64,6 +64,12 @@
   .trend .tip b { font-size: 12px; }
   .trend .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
   .tlegend { text-align: left; }
+  .keep .rk-stats .up { color: #1a8a55; font-weight: bold; }
+  .keep .rk-stats .down { color: #c0392b; font-weight: bold; }
+  .keep .ct { white-space: nowrap; }
+  .graph-more { margin-top: 14px; text-align: left; border-top: 1px solid var(--line); padding-top: 8px; }
+  .graph-more summary { cursor: pointer; font-size: 13px; font-weight: bold; color: var(--main-dark); padding: 6px 0; }
+  .graph-more .gnote { font-size: 11px; color: #999; margin: 0 0 6px; }
   .tlegend .rk-row .sw { width: 18px; height: 4px; border-radius: 2px; flex-shrink: 0; }
   .tlegend .tl-row { cursor: pointer; border-radius: 10px; }
   .tlegend .tl-row.on { background: var(--sub); }
@@ -285,7 +291,7 @@
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
     <button class="tab" data-rk="in" onclick="setRankKind('in')">TOP16入り</button>
-    <button class="tab" data-rk="trend" onclick="setRankKind('trend')">順位の推移</button>
+    <button class="tab" data-rk="trend" onclick="setRankKind('trend')">順位キープ</button>
     <button class="tab" data-rk="low" onclick="setRankKind('low')">10回以下の曲</button>
     <button class="tab" data-rk="zero" onclick="setRankKind('zero')">0回の曲</button>
   </div>
@@ -983,7 +989,7 @@ function parseStamp(t) {
 // 8色×（実線・点線）で16曲を区別する
 const TREND_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
 const TREND_N = 16, TREND_CAP = 30;
-let trendFocus = null, trendFrom = null;
+let trendFocus = null, trendFrom = null, trendGraphOpen = false;
 function renderTrend(byKey) {
   const box = document.getElementById('rk-list');
   box.innerHTML = '';
@@ -1035,6 +1041,39 @@ function renderTrend(byKey) {
   // 30位より下は「圏外」として線を切る
   const series = top.map((s, k) => ({ s, color: TREND_COLORS[k % 8], dash: k >= 8, ranks: snaps.map(m => { const r = m.get(s); return r && r <= TREND_CAP ? r : null; }) }));
   if (trendFocus && !top.includes(trendFocus)) trendFocus = null;
+  // ---- いつからその順位で、何時間キープしているか（1時間ごとに調べる） ----
+  const nowT = Math.max(Date.now(), t1);
+  const hrs = ms => Math.max(0, Math.round(ms / H));
+  const fmtDH = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}時`; };
+  const keep = document.createElement('div'); keep.className = 'keep';
+  top.forEach(s => {
+    const cur = last.get(s);
+    let n = fine.length - 1;
+    while (n >= 0 && fineSnaps[n].get(s) === cur) n--;
+    const since = n < 0 ? fine[0] : fine[n + 1];
+    const before = n < 0 ? null : (fineSnaps[n].get(s) || null);
+    const h = hrs(nowT - since);
+    const row = document.createElement('div'); row.className = 'rk-row';
+    const rk = document.createElement('div'); rk.className = 'rk'; rk.textContent = cur;
+    const nm = songNameEl(s);
+    const sub = document.createElement('div'); sub.className = 'rk-stats';
+    const mv = n < 0 ? '最初からこの順位' : before == null ? 'ランク外から浮上' : before > cur ? `${before}位から ↑` : `${before}位から ↓`;
+    sub.innerHTML = '';
+    const a1 = document.createElement('span'); a1.textContent = `${fmtDH(since)}ごろから`;
+    const a2 = document.createElement('span'); a2.className = before != null && before < cur ? 'down' : 'up'; a2.textContent = mv;
+    sub.append(a1, a2);
+    nm.appendChild(sub);
+    const ct = document.createElement('div'); ct.className = 'ct';
+    ct.innerHTML = h >= 48 ? `${Math.floor(h / 24)}<small>日</small>${h % 24 ? (h % 24) + '<small>時間</small>' : ''}` : `${h}<small>時間</small>`;
+    row.append(rk, jacketEl(s.j), nm, ct);
+    keep.appendChild(row);
+  });
+  box.appendChild(keep);
+  const gd = document.createElement('details'); gd.className = 'graph-more';
+  gd.open = trendGraphOpen;
+  gd.addEventListener('toggle', () => { trendGraphOpen = gd.open; });
+  const gs = document.createElement('summary'); gs.textContent = '順位の動きをグラフで見る'; gd.appendChild(gs);
+  box.appendChild(gd);
   // 描画
   const W = 340, Ht = 300, L = 30, R = 12, T = 12, B = 30;
   const maxRank = TREND_CAP;
@@ -1097,7 +1136,7 @@ function renderTrend(byKey) {
   hit.addEventListener('pointermove', show);
   hit.addEventListener('pointerdown', show);
   hit.addEventListener('pointerleave', hide);
-  box.appendChild(wrap);
+  gd.appendChild(wrap);
   // 凡例（色だけで区別しないよう、曲名と今の順位を必ず出す）
   const lg = document.createElement('div'); lg.className = 'tlegend';
   series.forEach(x => {
@@ -1115,9 +1154,9 @@ function renderTrend(byKey) {
     row.append(rk, sw, jacketEl(x.s.j), nm, ct);
     lg.appendChild(row);
   });
-  box.appendChild(lg);
+  gd.appendChild(lg);
   if (trendFrom) document.getElementById('rk-help').textContent =
-    `順位が落ち着いた ${trendFrom.getMonth() + 1}/${trendFrom.getDate()} ${trendFrom.getHours()}時ごろからの、いまの上位16曲の順位の動き（上ほど上位・${TREND_CAP}位より下は圏外）。下の一覧の行を押すとその曲だけ目立ちます`;
+    `いまの上位16曲が、いつからその順位で、何時間キープしているか（1時間ごとの集計・同点は同じ順位）`;
 }
 function renderRanking() {
   document.getElementById('rk-total').textContent = `集計した結果：${rkRows.length}件` + (rkExtra ? `（うちNMB48楽曲ソート ${rkExtra}件）` : '');
@@ -1127,7 +1166,7 @@ function renderRanking() {
     in: 'TOP16（1〜16位）に入った回数',
     low: 'TOP16に入った回数が1〜10回の曲',
     zero: 'まだ一度もTOP16に入っていない曲（発売順）',
-    trend: 'いまのポイント上位16曲の順位の動き（上ほど上位）。下の一覧の行を押すとその曲だけ目立ちます',
+    trend: 'いまの上位16曲が、いつからその順位で、何時間キープしているか',
   }[rkKind];
   const byKey = new Map(SONGS.map(s => [songKey(s), s]));
   const q = (document.getElementById('rk-search').value || '').trim();
