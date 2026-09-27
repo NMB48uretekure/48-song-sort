@@ -57,6 +57,10 @@
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
   .rk-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: #666; font-weight: normal; }
   .rk-stats b { color: #333; font-size: 13px; }
+  .srch-nav { display: flex; gap: 8px; margin: 0 0 8px; }
+  .srch-nav button { flex: 1; padding: 9px 6px; font-size: 13px; }
+  #rk-float { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 15;
+    padding: 12px 20px; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   .also { margin-top: 8px; padding: 8px 10px; background: var(--sub); border-radius: 10px; }
   .also p { margin: 0 0 6px; font-size: 11px; font-weight: bold; color: var(--main-dark); }
   .also .chips { justify-content: flex-start; margin: 0; }
@@ -262,6 +266,7 @@
   AKB48グループ各グループおよび運営会社とは一切関係ありません。
 </footer>
 
+<button id="rk-float" class="hidden" onclick="rkBackToList()">← ランキングに戻る</button>
 <div id="toast"></div>
 
 <script>
@@ -643,7 +648,7 @@ function openRanking() {
   buildRankGroups();
   loadRanking();
 }
-function closeRanking() { showPhase(1); window.scrollTo(0, 0); }
+function closeRanking() { document.getElementById('rk-float').classList.add('hidden'); showPhase(1); window.scrollTo(0, 0); }
 // 結果画面：自分の1位の曲がみんなのランキングで何位かを表示
 async function updateRankPromo() {
   const box = document.getElementById('rank-promo');
@@ -744,6 +749,27 @@ function listenLink(s) {
   return a;
 }
 // 検索した曲が何回選ばれたか（ポイント・1位・TOP16入り・順位ごとの回数）
+let rkHist = [], rkListScroll = 0;
+// 検索（詳細）を開く：ランキング一覧から開いたときは元の位置を覚えておく
+function rkOpenSong(title) {
+  const inp = document.getElementById('rk-search');
+  if (inp.value.trim()) rkHist.push(inp.value); else { rkHist = []; rkListScroll = window.scrollY; }
+  inp.value = title;
+  renderRanking();
+  inp.scrollIntoView({ block: 'start' });
+}
+function rkBackOne() {
+  const inp = document.getElementById('rk-search');
+  inp.value = rkHist.pop() || '';
+  renderRanking();
+  if (inp.value) inp.scrollIntoView({ block: 'start' }); else window.scrollTo(0, rkListScroll);
+}
+function rkBackToList() {
+  document.getElementById('rk-search').value = '';
+  rkHist = [];
+  renderRanking();
+  window.scrollTo(0, rkListScroll);
+}
 function renderRankSearch(q, byKey) {
   const norm = t => t.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
   const nq = norm(q);
@@ -762,7 +788,12 @@ function renderRankSearch(q, byKey) {
   const hits = pool.filter(s => norm(dispName(s.t)).includes(nq) || norm(s.t).includes(nq))
     .sort((a, b) => st.get(b).pt - st.get(a).pt);
   const box = document.getElementById('rk-list');
-  box.innerHTML = hits.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
+  box.innerHTML = '';
+  const nav = document.createElement('div'); nav.className = 'srch-nav';
+  if (rkHist.length) { const b1 = document.createElement('button'); b1.className = 'btn-light'; b1.textContent = '← 前の曲に戻る'; b1.onclick = rkBackOne; nav.appendChild(b1); }
+  const b2 = document.createElement('button'); b2.className = 'btn-light'; b2.textContent = '✕ ランキングに戻る'; b2.onclick = rkBackToList; nav.appendChild(b2);
+  box.appendChild(nav);
+  if (!hits.length) box.insertAdjacentHTML('beforeend', '<p class="empty-msg">見つかりませんでした</p>');
   if (hits.length) { const p = document.createElement('p'); p.className = 'help'; p.style.margin = '0 0 4px'; p.textContent = `${hits.length}曲`; box.appendChild(p); }
   // 「この曲を選んだ人は、こんな曲も選んでいます」用：曲ごとに、その曲が入っている投票の番号
   const rowsOf = new Map();
@@ -803,7 +834,7 @@ function renderRankSearch(q, byKey) {
           const b = document.createElement('button'); b.className = 'chip';
           b.textContent = dispName(t.t);
           const sm2 = document.createElement('small'); sm2.textContent = `${t.a}・${n}人`; b.appendChild(sm2);
-          b.onclick = () => { const inp = document.getElementById('rk-search'); inp.value = dispName(t.t); renderRanking(); inp.scrollIntoView({ block: 'center' }); };
+          b.onclick = () => rkOpenSong(dispName(t.t));
           cs.appendChild(b);
         });
         w.appendChild(cs); nm.appendChild(w);
@@ -827,6 +858,8 @@ function renderRanking() {
   const q = (document.getElementById('rk-search').value || '').trim();
   document.getElementById('rk-kind').classList.toggle('hidden', !!q);
   document.getElementById('rk-order').classList.toggle('hidden', !!q || rkKind === 'zero');
+  document.getElementById('rk-float').classList.toggle('hidden', !q || document.getElementById('phase4').classList.contains('hidden'));
+  if (!q) rkHist = [];
   if (q) { renderRankSearch(q, byKey); return; }
   const pool = SONGS.filter(s => rkGrp === 'all' || s.a === rkGrp);
   const inPool = new Set(pool);
@@ -878,7 +911,7 @@ function renderRanking() {
     }
     nm.style.cursor = 'pointer';
     nm.title = 'タップで詳しく見る';
-    nm.onclick = e => { if (e.target.closest('a')) return; const inp = document.getElementById('rk-search'); inp.value = dispName(s.t); renderRanking(); inp.scrollIntoView({ block: 'center' }); };
+    nm.onclick = e => { if (e.target.closest('a')) return; rkOpenSong(dispName(s.t)); };
     nm.appendChild(document.createElement('br'));
     nm.appendChild(listenLink(s));
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${v}<small>${unit}</small>`;
