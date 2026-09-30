@@ -191,6 +191,7 @@
   .mem-head .mt { font-size: 20px; font-weight: bold; }
   .mem-head small { display: block; color: #888; font-size: 12px; margin-top: 2px; }
   .mem-act { display: block; width: 100%; margin: 12px 0 4px; padding: 10px; border-radius: 999px; font-size: 13px; }
+  .mem-share { background: #000; margin-top: 0; }
   .mem-song { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f6dbe5; }
   .mem-song .jk, .mem-song .jk-ph { width: 34px; height: 34px; }
   .mem-song .nm { flex: 1; min-width: 0; }
@@ -1098,6 +1099,9 @@ function renderMemberModal(i) {
   const act = document.createElement('button'); act.className = 'mem-act'; act.textContent = `この${songs.length}曲でソートする`;
   act.onclick = () => sortMemberSongs(i);
   card.appendChild(act);
+  const msh = document.createElement('button'); msh.className = 'mem-act mem-share'; msh.textContent = '↗ 画像でシェア';
+  msh.onclick = () => shareMember(i);
+  card.appendChild(msh);
   let year = null;
   songs.forEach(s2 => {
     const y = songYear(s2) || '発売日不明';
@@ -1172,7 +1176,7 @@ function renderSongModal() {
   if (relDate(s)) { const dt = document.createElement('span'); dt.className = 'mdate'; dt.textContent = (/:stage:/.test(s.g) ? '公演初日 ' : '発売日 ') + fmtDate(relDate(s)); ht.appendChild(dt); }
   const acts = document.createElement('div'); acts.className = 'macts';
   acts.appendChild(listenLink(s));
-  const sh = document.createElement('button'); sh.type = 'button'; sh.className = 'shareb'; sh.textContent = '↗ シェア';
+  const sh = document.createElement('button'); sh.type = 'button'; sh.className = 'shareb'; sh.textContent = '↗ 画像でシェア';
   sh.onclick = () => shareSong(s);
   acts.appendChild(sh);
   ht.appendChild(acts);
@@ -1989,7 +1993,7 @@ function openSongList() {
   buildYearSelect();
   renderSongList();
   // みんなのランキングの数字も出すため、まだ読んでいなければ裏で読み込む
-  if (STATS.csvUrl && !rkRows.length) loadRanking().then(() => { if (!document.getElementById('phase5').classList.contains('hidden') && slMode === 'song') renderSongList(true); });
+  if (STATS.csvUrl && !rkRows.length) loadRanking().then(() => { if (!document.getElementById('phase5').classList.contains('hidden') && slMode === 'song') renderSongList(true); if (modalStack.length) renderSongModal(); });
 }
 function closeSongList() { closeModalNow(); showPhase(1); window.scrollTo(0, 0); }
 function setSlMode(m) {
@@ -2281,29 +2285,153 @@ async function saveImage() {
   } catch (e) {}
   showToast('保存できないときは、画像を長押しして保存してください');
 }
-// 曲の情報をシェア（スマホは共有メニュー、使えなければXの投稿画面）
-function songShareText(s) {
-  const lines = [`♪ ${dispName(s.t)}（${s.a}）`, dispSrc(s.s)];
-  if (relDate(s)) lines.push((/:stage:/.test(s.g) ? '公演初日 ' : '発売日 ') + fmtDate(relDate(s)));
-  const ids = SONG_MEM[s.id] || [];
-  if (ids.length) {
-    const names = ids.map(i => MEMBERS[i][0]);
-    lines.push('歌唱：' + (SONG_MEM_ALL.has(s.id) && ids.length > 8 ? (SONG_NOTE[s.id] || '全員').replace('（在籍期間からの推定）', '') + `（${ids.length}人）` : names.length > 8 ? names.slice(0, 8).join('、') + ` ほか${names.length - 8}人` : names.join('、')));
-  }
+// 曲の情報を画像にしてシェア（ポップアップの中身から歌唱メンバーを除いたもの）
+async function drawSongCard(s) {
+  const W = 1080, X0 = 80, IW = W - 160;
   const { st, ptRank } = rkStats();
-  const x = st.get(s);
-  if (x) lines.push(`みんなの人気曲ランキング ${ptRank.get(s)}位（1位に選ばれた回数 ${x.first}回）`);
+  const x = st.get(s) || { pt: 0, first: 0, in: 0 };
+  const also = x.in ? alsoFor(s) : [];
+  // 「こんな曲も」のチップを先に並べて高さを決める
+  const mc = document.createElement('canvas').getContext('2d');
+  const chips = []; let cx = 0, cy = 0; const CH = 64, CG = 14, CW = IW - 60;
+  also.forEach(([t2, n]) => {
+    mc.font = `bold 30px ${FONT}`; const a = fitText(mc, dispName(t2.t), CW - 200, 30, 'bold', 0.8); const wa = mc.measureText(a).width;
+    mc.font = `24px ${FONT}`; const sub = ` ${t2.a}・${n}人`; const wb = mc.measureText(sub).width;
+    const w = Math.min(CW, wa + wb + 48);
+    if (cx && cx + w > CW) { cx = 0; cy += CH + CG; }
+    chips.push({ a, sub, w, x: cx, y: cy }); cx += w + CG;
+  });
+  const alsoH = 90 + (also.length ? cy + CH : 50) + 30;
+  const topY = 80, statY = topY + 360, alsoY = statY + 190;
+  const H = alsoY + alsoH + 130;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffe6ef'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff'; roundRect(ctx, 40, 40, W - 80, H - 80, 40); ctx.fill();
+  // ジャケ写
+  const im = await loadJacket(s.j); const js = 300;
+  ctx.save(); roundRect(ctx, X0, topY + 20, js, js, 24); ctx.clip();
+  if (im) { const sz = Math.min(im.naturalWidth, im.naturalHeight); ctx.drawImage(im, (im.naturalWidth - sz) / 2, (im.naturalHeight - sz) / 2, sz, sz, X0, topY + 20, js, js); }
+  else { const g = ctx.createLinearGradient(X0, topY, X0 + js, topY + js); g.addColorStop(0, '#f58fb3'); g.addColorStop(1, '#e0457b'); ctx.fillStyle = g; ctx.fillRect(X0, topY + 20, js, js);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `bold 80px ${FONT}`; ctx.fillText((s.c === '公演曲' || /^(stg|ts)-/.test(s.j)) ? '公演' : '♪', X0 + js / 2, topY + 20 + js / 2); }
+  ctx.restore();
+  // 曲名・グループ・収録・日付
+  const tx = X0 + js + 40, tw = W - X0 - tx;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold 28px ${FONT}`; const gw = ctx.measureText(s.a).width + 36;
+  ctx.fillStyle = GCOLOR[s.a] || '#e0457b'; roundRect(ctx, tx, topY + 30, gw, 46, 23); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(s.a, tx + 18, topY + 63);
+  ctx.fillStyle = '#333'; ctx.fillText(fitText(ctx, dispName(s.t), tw, 62, 'bold', 0.45), tx, topY + 160);
+  ctx.fillStyle = '#888'; ctx.fillText(fitText(ctx, dispSrc(s.s), tw, 30, 'normal', 0.65), tx, topY + 220);
+  if (relDate(s)) { ctx.font = `28px ${FONT}`; ctx.fillText((/:stage:/.test(s.g) ? '公演初日 ' : '発売日 ') + fmtDate(relDate(s)), tx, topY + 268); }
+  // 数字の4マス
+  const cells = [['ポイント順位', ptRank.has(s) ? ptRank.get(s) : '−', ptRank.has(s) ? '位' : ''], ['ポイント', x.pt, '点'], ['1位', x.first, '回'], ['TOP16入り', x.in, '回']];
+  const cw = (IW - 3 * 16) / 4;
+  cells.forEach(([label, v, u], k) => {
+    const bx = X0 + k * (cw + 16);
+    ctx.fillStyle = '#fff5f8'; roundRect(ctx, bx, statY, cw, 150, 20); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#333'; ctx.font = `bold 58px ${FONT}`;
+    const vs = String(v); const vw = ctx.measureText(vs).width; ctx.font = `26px ${FONT}`; const uw = ctx.measureText(u).width;
+    ctx.font = `bold 58px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText(vs, bx + (cw - vw - uw) / 2, statY + 82);
+    ctx.fillStyle = '#999'; ctx.font = `26px ${FONT}`; ctx.fillText(u, bx + (cw - vw - uw) / 2 + vw, statY + 82);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#888'; ctx.font = `26px ${FONT}`; ctx.fillText(label, bx + cw / 2, statY + 124);
+  });
+  // この曲を選んだ人は、こんな曲も選んでいます
+  ctx.fillStyle = '#ffe6ef'; roundRect(ctx, X0, alsoY, IW, alsoH, 24); ctx.fill();
+  ctx.textAlign = 'left'; ctx.fillStyle = '#b8255a'; ctx.font = `bold 30px ${FONT}`;
+  ctx.fillText('この曲を選んだ人は、こんな曲も選んでいます', X0 + 30, alsoY + 58);
+  if (!also.length) { ctx.fillStyle = '#999'; ctx.font = `28px ${FONT}`; ctx.fillText(x.in ? 'まだデータが少ないので出せません' : 'まだ誰もTOP16に選んでいません', X0 + 30, alsoY + 115); }
+  chips.forEach(ch => {
+    const px = X0 + 30 + ch.x, py = alsoY + 90 + ch.y;
+    ctx.fillStyle = '#fff'; roundRect(ctx, px, py, ch.w, CH, CH / 2); ctx.fill();
+    ctx.strokeStyle = '#f7bfd2'; ctx.lineWidth = 2; roundRect(ctx, px, py, ch.w, CH, CH / 2); ctx.stroke();
+    ctx.fillStyle = '#b8255a'; ctx.font = `bold 30px ${FONT}`; ctx.fillText(ch.a, px + 24, py + 43);
+    const aw = ctx.measureText(ch.a).width;
+    ctx.fillStyle = '#c77'; ctx.font = `24px ${FONT}`; ctx.fillText(ch.sub, px + 24 + aw, py + 42);
+  });
+  ctx.textAlign = 'center'; ctx.fillStyle = '#bbb'; ctx.font = `26px ${FONT}`;
+  ctx.fillText('#48G楽曲ソート', W / 2, H - 70);
+  return c;
+}
+// シェア用のURL（開くとその曲・メンバーのページが出る）
+function shareUrl(key, val) {
   const u = pageUrl();
-  return lines.join('\n') + '\n\n#48G楽曲ソート' + (u ? '\n' + u : '');
+  return u ? u + '?' + key + '=' + encodeURIComponent(val) : '';
 }
 async function shareSong(s) {
-  const text = songShareText(s);
-  if (navigator.share) {
-    try { await navigator.share({ text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  showToast('画像を作成中…');
+  if (STATS.csvUrl && !rkRows.length) { try { await loadRanking(); } catch (e) {} }
+  let blob;
+  try { const c = await drawSongCard(s); blob = await new Promise(r => c.toBlob(r, 'image/png')); } catch (e) {}
+  if (!blob) { showToast('画像を作成できませんでした'); return; }
+  const name = (dispName(s.t).replace(/[\\/:*?"<>|]/g, '').slice(0, 30) || 'song') + '.png';
+  const u = shareUrl('song', s.id);
+  await shareImage(blob, name, `♪ ${dispName(s.t)}（${s.a}）\n#48G楽曲ソート` + (u ? '\n' + u : ''));
+}
+async function shareImage(blob, name, text) {
+  let file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
   }
-  try { await navigator.clipboard.writeText(text); showToast('曲の情報をコピーしました'); } catch (e) {}
-  const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-  setTimeout(() => { const w = window.open(url, '_blank'); if (!w) location.href = url; }, 600);
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) { try { await dl.save({ filename: name, data: blob }); showToast('画像を保存しました'); } catch (e) {} return; }
+  } catch (e) {}
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); showToast('画像を保存しました'); } catch (e) {}
+}
+// メンバーのページを画像に：名前・グループ・曲数と、歌っている曲のジャケ写を並べる
+async function drawMemberCard(i) {
+  const [name, g, , ki] = MEMBERS[i];
+  const songs = MEM_SONGS[i];
+  const rels = []; const seen = new Set();
+  songs.forEach(x => { if (!seen.has(x.j || x.g)) { seen.add(x.j || x.g); rels.push(x); } });
+  const MAX = 30, shown = rels.slice(0, MAX);
+  const W = 1080, cols = 6, tile = 150, gap = 12, gx = (W - cols * tile - (cols - 1) * gap) / 2;
+  const rows = Math.ceil(shown.length / cols), top = 330;
+  const H = top + rows * (tile + gap) + (rels.length > MAX ? 70 : 20) + 110;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffe6ef'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff'; roundRect(ctx, 40, 40, W - 80, H - 80, 40); ctx.fill();
+  // 名前まわり
+  const col = GCOLOR[g] || '#e0457b';
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(190, 185, 90, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `bold 84px ${FONT}`;
+  ctx.fillText(name.replace(/[\s・]/g, '').slice(0, 1), 190, 190);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#333';
+  ctx.fillText(fitText(ctx, name, W - 380, 76, 'bold', 0.5), 310, 175);
+  ctx.fillStyle = '#888'; ctx.font = `32px ${FONT}`;
+  ctx.fillText([g, ki].filter(Boolean).join('・'), 310, 225);
+  ctx.fillStyle = col; ctx.font = `bold 36px ${FONT}`;
+  ctx.fillText(`歌っている曲 ${songs.length}曲`, 310, 275);
+  // ジャケ写（発売順）
+  const ims = await Promise.all(shown.map(x => loadJacket(x.j)));
+  shown.forEach((x, k) => {
+    const cx = gx + (k % cols) * (tile + gap), cy = top + Math.floor(k / cols) * (tile + gap);
+    ctx.save(); roundRect(ctx, cx, cy, tile, tile, 14); ctx.clip();
+    const im = ims[k];
+    if (im) { const sz = Math.min(im.naturalWidth, im.naturalHeight); ctx.drawImage(im, (im.naturalWidth - sz) / 2, (im.naturalHeight - sz) / 2, sz, sz, cx, cy, tile, tile); }
+    else {
+      const gr = ctx.createLinearGradient(cx, cy, cx + tile, cy + tile); gr.addColorStop(0, '#f58fb3'); gr.addColorStop(1, '#e0457b');
+      ctx.fillStyle = gr; ctx.fillRect(cx, cy, tile, tile);
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `bold 38px ${FONT}`;
+      ctx.fillText((x.c === '公演曲' || /^(stg|ts)-/.test(x.j)) ? '公演' : '♪', cx + tile / 2, cy + tile / 2);
+    }
+    ctx.restore();
+  });
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  let y = top + rows * (tile + gap) + 20;
+  if (rels.length > MAX) { ctx.fillStyle = '#888'; ctx.font = `30px ${FONT}`; ctx.fillText(`ほか${rels.length - MAX}作品`, W / 2, y + 30); y += 70; }
+  ctx.fillStyle = '#bbb'; ctx.font = `26px ${FONT}`; ctx.fillText('#48G楽曲ソート', W / 2, H - 70);
+  return c;
+}
+async function shareMember(i) {
+  showToast('画像を作成中…');
+  let blob;
+  try { const c = await drawMemberCard(i); blob = await new Promise(r => c.toBlob(r, 'image/png')); } catch (e) {}
+  if (!blob) { showToast('画像を作成できませんでした'); return; }
+  const u = shareUrl('member', MEMBERS[i][0]);
+  await shareImage(blob, MEMBERS[i][0] + '.png', `${MEMBERS[i][0]}（${MEMBERS[i][1]}）が歌っている曲 ${MEM_SONGS[i].length}曲\n#48G楽曲ソート` + (u ? '\n' + u : ''));
 }
 async function shareToX() {
   if (!resultBlob) { showToast('画像を作成中です。少し待ってください'); return; }
@@ -2363,6 +2491,15 @@ buildTopSelect();
 setTop(TOP_N);
 renderList();
 showPhase(1);
+// シェアされたURL（?song=曲のID / ?member=名前）で開いたら、そのページを出す
+(() => {
+  try {
+    const q = new URLSearchParams(location.search);
+    const sid = q.get('song'), mn = q.get('member');
+    if (sid != null && SONG_BY_ID[+sid]) { openSongList(); openSongModal(SONG_BY_ID[+sid]); }
+    else if (mn) { const i = MEMBERS.findIndex(m => m[0] === mn); if (i >= 0) { openSongList(); openMemberModal(i); } }
+  } catch (e) {}
+})();
 </script>
 </body>
 </html>
