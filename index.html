@@ -1925,18 +1925,30 @@ function fitText(ctx, text, maxW, size, weight, minRatio = 0.6) {
 }
 
 // 1枚ぶんの曲カード（順位・ジャケ写・曲名・収録）
+// 結果画像の色（1つのグループだけの結果なら、そのグループの色にする）
+let RESULT_THEME = { main: '#e0457b', bg: '#ffe6ef', shadow: 'rgba(224,69,123,.15)', line: '#f3e2cf' };
+function hexMix(hex, to, t) {
+  const a = hex.match(/\w\w/g).map(x => parseInt(x, 16)), b = to.match(/\w\w/g).map(x => parseInt(x, 16));
+  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function themeFor(list) {
+  const gs = [...new Set(list.map(s => s.a))];
+  if (gs.length !== 1 || !GCOLOR[gs[0]]) return { group: null, main: '#e0457b', bg: '#ffe6ef', shadow: 'rgba(224,69,123,.15)', line: '#f3e2cf' };
+  const c = GCOLOR[gs[0]], rgb = c.match(/\w\w/g).map(x => parseInt(x, 16));
+  return { group: gs[0], main: c, bg: hexMix(c, '#ffffff', 0.84), shadow: `rgba(${rgb.join(',')},.18)`, line: hexMix(c, '#ffffff', 0.72) };
+}
 function drawCard(ctx, s, rank, im, x, y, w, h, p) {
   ctx.save();
-  ctx.shadowColor = 'rgba(224,69,123,.15)'; ctx.shadowBlur = p.top ? 12 : p.shadow; ctx.shadowOffsetY = 3;
+  ctx.shadowColor = RESULT_THEME.shadow; ctx.shadowBlur = p.top ? 12 : p.shadow; ctx.shadowOffsetY = 3;
   ctx.fillStyle = p.top ? '#fffaf2' : (rank <= 3 ? '#fffdf9' : '#fff');
   roundRect(ctx, x, y, w, h, p.r); ctx.fill();
   ctx.restore();
   ctx.lineWidth = p.lw;
-  ctx.strokeStyle = rank === 1 ? '#e6b422' : rank <= 3 ? '#ffc58a' : '#f3e2cf';
+  ctx.strokeStyle = rank === 1 ? '#e6b422' : rank <= 3 ? '#ffc58a' : RESULT_THEME.line;
   roundRect(ctx, x, y, w, h, p.r); ctx.stroke();
   // 順位
   const bs = p.bs;
-  ctx.fillStyle = rank === 1 ? '#e6b422' : rank === 2 ? '#b5b5b5' : rank === 3 ? '#cd7f32' : '#e0457b';
+  ctx.fillStyle = rank === 1 ? '#e6b422' : rank === 2 ? '#b5b5b5' : rank === 3 ? '#cd7f32' : RESULT_THEME.main;
   roundRect(ctx, x + p.pad, y + (h - bs) / 2, bs, bs, bs / 2); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `bold ${Math.round(bs * (rank >= 100 ? 0.34 : rank >= 10 ? 0.4 : 0.48))}px ${FONT}`;
@@ -1970,23 +1982,22 @@ const TOP_CARD = { top: true, r: 22, lw: 6, pad: 22, bs: 110, gap: 20, gap2: 24,
 async function drawResultImage(list) {
   const jackets = await Promise.all(list.map(s => loadJacket(s.j)));
   const wide = list.length > 16;   // 17曲以上は2列にして、100曲でも縦に長くなりすぎないようにする
-  const W = 1080, topH = wide ? 170 : 190, headH = 270;
+  const W = 1080, topH = wide ? 170 : 190, headH = 236;
   const rowH = wide ? (list.length <= 40 ? 84 : 66) : (list.length > 10 ? 86 : 100), gapY = wide ? 8 : 12;
   const rest = list.length - 1, rows = wide ? Math.ceil(rest / 2) : rest;
   const H = headH + topH + 16 + rows * (rowH + gapY) - gapY + 70;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#ffe6ef'; ctx.fillRect(0, 0, W, H);
+  RESULT_THEME = themeFor(list);
+  ctx.fillStyle = RESULT_THEME.bg; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#fff'; roundRect(ctx, 30, 30, W - 60, H - 60, 36); ctx.fill();
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#333'; ctx.font = `bold 48px ${FONT}`;
   ctx.fillText('あなたの', W / 2, 116);
-  ctx.fillStyle = '#e0457b'; ctx.font = `bold 64px ${FONT}`;
-  ctx.fillText(`48グループ 好きな曲 TOP${list.length}`, W / 2, 194);
-  ctx.fillStyle = '#999'; ctx.font = `28px ${FONT}`;
-  ctx.fillText('楽曲ソートの結果', W / 2, 240);
+  ctx.fillStyle = RESULT_THEME.main; ctx.font = `bold 64px ${FONT}`;
+  ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲 TOP${list.length}`, W / 2, 194);
 
   const rankOf = i => finalRanks[i] || i + 1;
   if (!wide) {
@@ -2287,7 +2298,7 @@ function shareText() {
   const cut = t => { t = dispName(t); return t.length > 18 ? t.slice(0, 17) + '…' : t; };
   const lines = finalList.slice(0, 7).map((s, i) => `${finalRanks[i] || i + 1}位 ${cut(s.t)}`);
   const u = pageUrl();
-  return `${resultTag()}` + (u ? `\n${u}` : '') + `\n\n私の48グループ 好きな曲TOP${finalList.length}\n\n${lines.join('\n')}`;
+  return `${resultTag()}` + (u ? `\n${u}` : '') + `\n\n私の${themeFor(finalList).group || '48グループ'} 好きな曲TOP${finalList.length}\n\n${lines.join('\n')}`;
 }
 function resultFile() {
   if (!resultBlob) return null;
