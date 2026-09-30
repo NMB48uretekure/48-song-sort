@@ -180,6 +180,16 @@
   .macts .listen { margin-top: 0; }
   .shareb { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: bold; background: #000; color: #fff; }
   .shareb:active { opacity: .7; }
+  .contact h3 { margin: 0 0 4px; font-size: 18px; }
+  .contact p.sub { margin: 0 0 12px; font-size: 12px; color: #888; line-height: 1.6; }
+  .contact label { display: block; font-size: 13px; font-weight: bold; margin: 12px 0 6px; color: #444; }
+  .contact .chips { justify-content: flex-start; margin: 0; }
+  .contact textarea, .contact input { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 10px; }
+  .contact textarea { min-height: 140px; resize: vertical; }
+  .contact .send { width: 100%; margin-top: 16px; padding: 13px; border-radius: 999px; font-size: 15px; }
+  .contact .done { text-align: center; padding: 30px 0 10px; font-size: 15px; line-height: 1.8; }
+  .contact-link { background: none; color: var(--main-dark); text-decoration: underline; font-size: 12px; font-weight: bold; padding: 6px; }
+  .mistake { display: block; margin: 10px auto 0; background: none; color: #999; font-size: 11px; font-weight: normal; text-decoration: underline; padding: 4px; }
   .mdate { display: block; color: #888; font-size: 12px; margin-top: 3px; }
   .mems { margin-top: 10px; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 10px; }
   .mems p { margin: 0 0 6px; font-size: 11px; font-weight: bold; color: var(--main-dark); }
@@ -397,6 +407,7 @@
     <select id="sl-year" onchange="renderSongList()" aria-label="年でしぼる"></select>
   </div>
   <p class="help" id="sl-help" style="margin:0 0 6px"></p>
+  <p class="help" style="margin:0 0 8px">※歌唱メンバーや発売日などは個人で調べたもので、正しいとは限りません</p>
   <div id="sl-list"></div>
   <button class="btn-wide" onclick="closeSongList()">ソートに戻る</button>
 </div>
@@ -411,7 +422,9 @@
 
 <footer class="site-note">
   ※このサイトはファンが個人で制作した非公式サイトです。<br>
-  AKB48グループ各グループおよび運営会社とは一切関係ありません。
+  AKB48グループ各グループおよび運営会社とは一切関係ありません。<br>
+  ※曲の情報（歌唱メンバー・発売日・期生など）は個人で調べたものなので、正しいとは限りません。<br>
+  <button class="contact-link" type="button" onclick="openContact()">お問い合わせ・間違いの報告</button>
 </footer>
 
 <div id="song-modal" class="hidden" role="dialog" aria-modal="true"><div class="mbg" onclick="closeSongModal()"></div><div class="mcard" id="song-modal-card"></div></div>
@@ -1164,7 +1177,8 @@ function membersBox(s) {
 }
 function renderSongModal() {
   const s0 = modalStack[modalStack.length - 1];
-  if (s0) setUrlState(s0.mem != null ? { member: MEMBERS[s0.mem][0], song: null } : { song: s0.id, member: null });
+  if (s0 && !s0.contact) setUrlState(s0.mem != null ? { member: MEMBERS[s0.mem][0], song: null } : { song: s0.id, member: null });
+  if (s0 && s0.contact) { renderContact(s0.contact); return; }
   if (s0 && s0.mem != null) { renderMemberModal(s0.mem); return; }
   const s = s0;
   const { st, ptRank } = rkStats();
@@ -1193,6 +1207,9 @@ function renderSongModal() {
     + cell('ポイント', x.pt, '点') + cell('1位', x.first, '回') + cell('TOP16入り', x.in, '回');
   card.appendChild(stats);
   card.appendChild(membersBox(s));
+  const mis = document.createElement('button'); mis.type = 'button'; mis.className = 'mistake'; mis.textContent = 'この曲の情報の間違いを報告する';
+  mis.onclick = () => openContact('データの間違い', `【${dispName(s.t)}（${s.a}）】\n`);
+  card.appendChild(mis);
   const also = x.in ? alsoFor(s) : [];
   const w = document.createElement('div'); w.className = 'also';
   const p = document.createElement('p'); p.textContent = 'この曲を選んだ人は、こんな曲も選んでいます'; w.appendChild(p);
@@ -2416,7 +2433,8 @@ async function drawMemberCard(i) {
   const [name, g, , ki] = MEMBERS[i];
   const songs = MEM_SONGS[i];
   const MAX = 30;
-  const { list, note } = pickMemberSongs(i, MAX);
+  const { list } = pickMemberSongs(i, MAX);
+  const note = '';
   const big = list.length <= 6;                   // 曲が少ない人は大きく見せる
   const cols = big ? 1 : 2, W = 1080, X0 = 80, IW = W - 160;
   const rowH = big ? 170 : 96, colW = (IW - (cols - 1) * 24) / cols, js = big ? 140 : 76;
@@ -2480,6 +2498,52 @@ async function shareMember(i) {
   if (!blob) { showToast('画像を作成できませんでした'); return; }
   const u = shareUrl('member', MEMBERS[i][0]);
   await shareImage(blob, MEMBERS[i][0] + '.png', `${MEMBERS[i][0]}（${MEMBERS[i][1]}）が歌っている曲 ${MEM_SONGS[i].length}曲\n#48G楽曲ソート` + (u ? '\n' + u : ''));
+}
+/* ---------- お問い合わせ（Googleフォームに送る） ---------- */
+const CONTACT = {
+  formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScEhxrGyVtZeGIrWKhzDceVt8Bi9zGMNg1hsVOgF9vzTlEJpQ/viewform',
+  type: 'entry.2018720382', body: 'entry.1234035892',
+  types: ['データの間違い', '要望', 'その他'],
+};
+function openContact(type, text) {
+  const card = document.getElementById('song-modal-card');
+  const item = { contact: { type: type || 'データの間違い', text: text || '' } };
+  if (modalStack.length && !document.getElementById('song-modal').classList.contains('hidden')) { modalStack.push(item); renderSongModal(); return; }
+  modalStack = [item]; modalFrom = null;
+  renderSongModal();
+  document.getElementById('song-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  popFrom(card, null);
+}
+function renderContact(c) {
+  const card = document.getElementById('song-modal-card');
+  card.innerHTML = ''; card.scrollTop = 0;
+  modalTopBar(card);
+  const w = document.createElement('div'); w.className = 'contact';
+  w.innerHTML = '<h3>お問い合わせ・間違いの報告</h3><p class="sub">データの間違い（歌唱メンバー・発売日など）や、ほしい機能などを送ってください。※返信はできません。</p>';
+  const l1 = document.createElement('label'); l1.textContent = '種類'; w.appendChild(l1);
+  const cs = document.createElement('div'); cs.className = 'chips';
+  const drawChips = () => { cs.innerHTML = ''; CONTACT.types.forEach(t => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (c.type === t ? ' on' : ''); b.textContent = t; b.onclick = () => { c.type = t; drawChips(); }; cs.appendChild(b); }); };
+  drawChips(); w.appendChild(cs);
+  const l2 = document.createElement('label'); l2.textContent = '内容'; w.appendChild(l2);
+  const ta = document.createElement('textarea'); ta.value = c.text; ta.placeholder = '例：○○の歌唱メンバーに△△が入っていません'; ta.oninput = () => c.text = ta.value; w.appendChild(ta);
+  const send = document.createElement('button'); send.className = 'send'; send.type = 'button'; send.textContent = '送信する';
+  send.onclick = async () => {
+    const text = (c.text || '').trim();
+    if (!text) { showToast('内容を書いてください'); ta.focus(); return; }
+    send.disabled = true; send.textContent = '送信中…';
+    try {
+      const body = new URLSearchParams();
+      body.append(CONTACT.type, c.type);
+      body.append(CONTACT.body, text);
+      await fetch(CONTACT.formUrl.replace(/\/viewform.*$/, '/formResponse'), { method: 'POST', mode: 'no-cors', body });
+      w.innerHTML = '<div class="done">送信しました。<br>ありがとうございました！</div>';
+    } catch (e) {
+      send.disabled = false; send.textContent = '送信する'; showToast('送信できませんでした。通信状態を確認してください');
+    }
+  };
+  w.appendChild(send);
+  card.appendChild(w);
 }
 async function shareToX() {
   if (!resultBlob) { showToast('画像を作成中です。少し待ってください'); return; }
