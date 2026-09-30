@@ -2227,7 +2227,7 @@ function memHead(i) {
 }
 const MEM_TEN = MEMBERS.map(m => (m[5] || '').split(';').filter(Boolean).map(x => x.split('|')));
 function renderMemberList(q, year) {
-  document.getElementById('sl-help').textContent = '名前を押すと、その人が歌っている曲が見られます（グループは一番多く歌っているグループで分けています）';
+  document.getElementById('sl-help').textContent = '名前を押すと、その人が歌っている曲が見られます';
   const cnt = i => year ? MEM_SONGS[i].filter(s => songYear(s) === year).length : MEM_SONGS[i].length;
   // 年を選んだときは、その年の1月1日に在籍していた人も（0曲でも）出す
   const D = year ? year + '-01-01' : null;
