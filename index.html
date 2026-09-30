@@ -3,6 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* Googleアナリティクス（公開サイトのときだけ動かす） */
+window.dataLayer = window.dataLayer || [];
+function gtag(){ dataLayer.push(arguments); }
+(function () {
+  if (!/github\.io$/.test(location.hostname)) return;
+  var sc = document.createElement('script'); sc.async = true;
+  sc.src = 'https://www.googletagmanager.com/gtag/js?id=G-L62E3P08J5';
+  document.head.appendChild(sc);
+  gtag('js', new Date()); gtag('config', 'G-L62E3P08J5');
+})();
+function track(name, params) { try { gtag('event', name, params || {}); } catch (e) {} }
+</script>
 <title>48グループ 楽曲ソート</title>
 <style>
   :root {
@@ -1044,6 +1057,7 @@ function popFrom(card, rect, reverse) {
     { duration: reverse ? 180 : 280, easing: reverse ? 'ease-in' : 'cubic-bezier(.2,.9,.3,1.2)' });
 }
 function openSongModal(s, push, ev) {
+  if (s && s.t) track('view_song', { song_title: s.t, group: s.a || '' });
   const card = document.getElementById('song-modal-card');
   if (push) {
     modalStack.push(s);
@@ -1071,6 +1085,7 @@ function closeSongModal() {
 }
 function songModalBack() { modalStack.pop(); if (modalStack.length) renderSongModal(); else closeSongModal(); }
 function openMemberModal(i, push, ev) {
+  if (MEMBERS[i]) track('view_member', { member_name: MEMBERS[i][0], group: MEMBERS[i][1] });
   const card = document.getElementById('song-modal-card');
   const item = { mem: i };
   if (push) {
@@ -1717,6 +1732,7 @@ function setUrlState(updates) {
   } catch (e) {}
 }
 function showPhase(n) {
+  track('view_screen', { screen: ['', 'home', 'battle', 'result', 'ranking', 'song_list'][n] || String(n) });
   setUrlState({ view: n === 4 ? 'rank' : n === 5 ? 'list' : null });
   if (n !== 4 && n !== 5) setUrlState({ song: null, member: null });
   [1, 2, 3, 4, 5].forEach(i => document.getElementById('phase' + i).classList.toggle('hidden', i !== n));
@@ -1736,6 +1752,7 @@ function startSort() {
   sortQueues = list.map(s => [s]);
   parentQueue = []; undoStack = []; battleCount = 0; ties = [];
   document.getElementById('resume-box').classList.add('hidden');
+  track('sort_start', { song_count: list.length, top_n: TOP_N });
   showPhase(2);
   window.scrollTo(0, 0);
   nextMergeStep();
@@ -2412,6 +2429,7 @@ async function shareSong(s) {
   await shareImage(blob, name, `♪ ${dispName(s.t)}（${s.a}）\n#48G楽曲ソート` + (u ? '\n' + u : ''));
 }
 async function shareImage(blob, name, text) {
+  track('share', { file_name: name });
   let file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
   if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
