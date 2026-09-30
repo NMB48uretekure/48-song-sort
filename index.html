@@ -1111,7 +1111,7 @@ function renderMemberModal(i) {
   const ht = document.createElement('div');
   const t = document.createElement('div'); t.className = 'mt'; t.textContent = name; ht.appendChild(t);
   const sm = document.createElement('small'); sm.textContent = `${g}・歌っている曲 ${songs.length}曲`; ht.appendChild(sm);
-  head.append(memAvatar(i), ht);
+  head.append(ht);
   card.appendChild(head);
   const act = document.createElement('button'); act.className = 'mem-act'; act.textContent = `この${songs.length}曲でソートする`;
   act.onclick = () => sortMemberSongs(i);
@@ -2275,7 +2275,7 @@ function slMemMore() {
     sm.textContent = [MEMBERS[i][1], MEMBERS[i][3] && MEMBERS[i][3] !== 'その他' ? MEMBERS[i][3] : '', slMemSort === 'age' ? bdt : MEMBERS[i][2]].filter(Boolean).join('・');
     nm.append(b, sm);
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${c}<small>曲</small>`;
-    row.append(memAvatar(i), nm, ct);
+    row.append(nm, ct);
     box.appendChild(row);
   }
   slMemShown = end;
@@ -2460,15 +2460,12 @@ async function drawMemberCard(i) {
   ctx.fillStyle = '#ffe6ef'; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#fff'; roundRect(ctx, 40, 40, W - 80, H - 80, 40); ctx.fill();
   const col = GCOLOR[g] || '#e0457b';
-  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(170, 175, 85, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `bold 80px ${FONT}`;
-  ctx.fillText(name.replace(/[\s・]/g, '').slice(0, 1), 170, 180);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#333';
-  ctx.fillText(fitText(ctx, name, W - 360, 74, 'bold', 0.5), 290, 160);
+  ctx.fillText(fitText(ctx, name, W - 200, 74, 'bold', 0.5), X0, 150);
   ctx.fillStyle = '#888'; ctx.font = `30px ${FONT}`;
-  ctx.fillText([g, ki].filter(Boolean).join('・'), 290, 208);
+  ctx.fillText([g, ki].filter(Boolean).join('・'), X0, 208);
   ctx.fillStyle = col; ctx.font = `bold 38px ${FONT}`;
-  ctx.fillText(`歌っている曲 ${songs.length}曲`, 290, 262);
+  ctx.fillText(`歌っている曲 ${songs.length}曲`, X0, 262);
   // カテゴリのチップ
   let px = X0, py = 300;
   ctx.font = `bold 24px ${FONT}`;
