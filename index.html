@@ -151,6 +151,24 @@
   .top-choice small { display: block; font-size: 10px; color: #999; margin-top: 2px; }
   .top-choice.active { background: var(--main); border-color: var(--main); color: #fff; }
   .top-choice.active small { color: #ffe3ee; }
+  .top-custom { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 10px; padding: 10px 12px; margin: 0 0 10px;
+    border-radius: 12px; background: #fff; border: 2px solid var(--line); color: var(--main-dark); cursor: pointer; }
+  .top-custom .tc-l { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 17px; }
+  .top-custom small { font-size: 10px; color: #999; }
+  .top-custom select { font: inherit; font-size: 16px; font-weight: bold; color: var(--main-dark); background: #fff; border: 2px solid var(--line);
+    border-radius: 10px; padding: 6px 30px 6px 12px; -webkit-appearance: none; appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b8255a' stroke-width='2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  .top-custom.active { background: var(--main); border-color: var(--main); color: #fff; }
+  .top-custom.active small { color: #ffe3ee; }
+  .top-custom.active select { border-color: #fff; }
+  .top-links { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 0 0 12px; }
+  .top-links .rank-link { margin: 0; white-space: nowrap; padding: 8px 14px; }
+  .sl-row { display: flex; align-items: flex-start; gap: 8px; text-align: left; padding: 7px 2px 8px; border-bottom: 1px solid #f6dbe5; }
+  .sl-row .nm { flex: 1; min-width: 0; }
+  .sl-cat { flex-shrink: 0; margin-top: 3px; font-size: 10px; font-weight: bold; color: var(--main-dark); background: var(--sub); border-radius: 6px; padding: 2px 6px; }
+  .sl-row .rk-stats { margin-top: 2px; }
+  .sl-more { margin: 14px auto 0; }
   .list-label { margin-top: 6px; }
   .allchip { background: #fff; color: #555; border-color: #999; }
   .allchip.on { background: var(--main); color: #fff; border-color: var(--main); }
@@ -205,7 +223,10 @@
 <body>
 
 <h1>48グループ 楽曲ソート</h1>
-<button class="rank-link hidden" id="rank-link" onclick="openRanking()">みんなの人気曲ランキングを見る</button>
+<div class="top-links" id="top-links">
+  <button class="rank-link hidden" id="rank-link" onclick="openRanking()">みんなの人気曲ランキング</button>
+  <button class="rank-link" id="list-link" onclick="openSongList()">楽曲一覧</button>
+</div>
 <p class="desc">AKB48・SKE48・NMB48・HKT48・NGT48・STU48・SDN48 の表題曲・カップリング・アルバム曲・劇場公演曲・ユニット曲・ソロ曲から</p>
 
 <!-- 予選 -->
@@ -235,6 +256,10 @@
       <button class="top-choice" data-top="7" onclick="setTop(7)"><b>TOP7</b><small>1〜7位を決める</small></button>
       <button class="top-choice active" data-top="10" onclick="setTop(10)"><b>TOP10</b><small>1〜10位を決める</small></button>
       <button class="top-choice" data-top="16" onclick="setTop(16)"><b>TOP16</b><small>1〜16位を決める</small></button>
+    </div>
+    <div class="top-custom" id="top-custom" onclick="openTopPicker(event)">
+      <span class="tc-l">TOP<select id="top-select" onchange="setTop(Number(this.value))" aria-label="何位まで決めるか（17〜100位）"></select>まで決める</span>
+      <small>17〜100位から自由に選べます</small>
     </div>
   </div>
   <p class="pick-label list-label"><span class="step">4</span>好きな曲をタップして選んでください</p>
@@ -303,6 +328,18 @@
   <div id="rk-list"></div>
   <button class="btn-wide btn-light" onclick="loadRanking()">最新にする</button>
   <button class="btn-wide" onclick="closeRanking()">ソートに戻る</button>
+</div>
+
+<!-- 楽曲一覧 -->
+<div id="phase5" class="step-container hidden">
+  <h2>楽曲一覧</h2>
+  <p class="desc" id="sl-total"></p>
+  <div class="chips" id="sl-grp"></div>
+  <div class="chips" id="sl-cat"></div>
+  <input class="search" id="sl-search" type="search" placeholder="曲名・シングル・アルバム・公演名で検索" oninput="renderSongList()">
+  <p class="help" style="margin:0 0 6px">曲名を押すと、みんなのランキングでの順位や一緒に選ばれている曲が見られます</p>
+  <div id="sl-list"></div>
+  <button class="btn-wide" onclick="closeSongList()">ソートに戻る</button>
 </div>
 
 <div class="sticky-bar" id="sticky-bar">
@@ -1327,9 +1364,25 @@ function loadJacket(key) {
 }
 
 /* ---------- 予選 ---------- */
+const validTop = n => Number.isInteger(n) && n >= 7 && n <= 100;
+function buildTopSelect() {
+  const sel = document.getElementById('top-select');
+  sel.innerHTML = '<option value="" disabled>数を選ぶ</option>';
+  for (let n = 17; n <= 100; n++) sel.add(new Option(n + '位', n));
+}
+// 17〜100位は、ボタンの枠のどこを押しても選択肢（ピッカー）が開くようにする
+function openTopPicker(e) {
+  const sel = document.getElementById('top-select');
+  if (e.target === sel) return;
+  try { if (sel.showPicker) { sel.showPicker(); return; } } catch (err) {}
+  sel.focus(); sel.click();
+}
 function setTop(n) {
+  if (!validTop(n)) return;
   TOP_N = n;
   document.querySelectorAll('[data-top]').forEach(b => b.classList.toggle('active', Number(b.dataset.top) === n));
+  document.getElementById('top-custom').classList.toggle('active', n > 16);
+  document.getElementById('top-select').value = n > 16 ? String(n) : '';
   updateBar();
 }
 
@@ -1451,8 +1504,9 @@ function estimate(n) {
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 function showPhase(n) {
-  [1, 2, 3, 4].forEach(i => document.getElementById('phase' + i).classList.toggle('hidden', i !== n));
-  document.getElementById('rank-link').classList.toggle('hidden', !STATS.csvUrl || n !== 1);   // 予選画面のときだけ表示
+  [1, 2, 3, 4, 5].forEach(i => document.getElementById('phase' + i).classList.toggle('hidden', i !== n));
+  document.getElementById('top-links').classList.toggle('hidden', n !== 1);   // 予選画面のときだけ表示
+  document.getElementById('rank-link').classList.toggle('hidden', !STATS.csvUrl);
   document.getElementById('sticky-bar').classList.toggle('hidden', n !== 1);
 }
 
@@ -1573,7 +1627,7 @@ function resumeSort() {
   const d = loadProgress();
   document.getElementById('resume-box').classList.add('hidden');
   if (!d || !d.snap) return;
-  if ([7, 10, 16].includes(d.top)) TOP_N = d.top;
+  if (validTop(d.top)) TOP_N = d.top;
   restoreSnap(d.snap);
   undoStack = d.undo || [];
   showPhase(2);
@@ -1649,10 +1703,56 @@ function fitText(ctx, text, maxW, size, weight, minRatio = 0.6) {
   return t;
 }
 
+// 1枚ぶんの曲カード（順位・ジャケ写・曲名・収録）
+function drawCard(ctx, s, rank, im, x, y, w, h, p) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(224,69,123,.15)'; ctx.shadowBlur = p.top ? 12 : p.shadow; ctx.shadowOffsetY = 3;
+  ctx.fillStyle = p.top ? '#fffaf2' : (rank <= 3 ? '#fffdf9' : '#fff');
+  roundRect(ctx, x, y, w, h, p.r); ctx.fill();
+  ctx.restore();
+  ctx.lineWidth = p.lw;
+  ctx.strokeStyle = rank === 1 ? '#e6b422' : rank <= 3 ? '#ffc58a' : '#f3e2cf';
+  roundRect(ctx, x, y, w, h, p.r); ctx.stroke();
+  // 順位
+  const bs = p.bs;
+  ctx.fillStyle = rank === 1 ? '#e6b422' : rank === 2 ? '#b5b5b5' : rank === 3 ? '#cd7f32' : '#e0457b';
+  roundRect(ctx, x + p.pad, y + (h - bs) / 2, bs, bs, bs / 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.round(bs * (rank >= 100 ? 0.34 : rank >= 10 ? 0.4 : 0.48))}px ${FONT}`;
+  ctx.fillText(rank + (p.top ? '位' : ''), x + p.pad + bs / 2, y + h / 2 + 2);
+  // ジャケ写
+  const js = p.js, jx = x + p.pad + bs + p.gap, jy = y + (h - js) / 2;
+  ctx.save();
+  roundRect(ctx, jx, jy, js, js, Math.max(6, js / 10)); ctx.clip();
+  if (im) {
+    const sz = Math.min(im.naturalWidth, im.naturalHeight);
+    ctx.drawImage(im, (im.naturalWidth - sz) / 2, (im.naturalHeight - sz) / 2, sz, sz, jx, jy, js, js);
+  } else {
+    const g = ctx.createLinearGradient(jx, jy, jx + js, jy + js);
+    g.addColorStop(0, '#f58fb3'); g.addColorStop(1, '#e0457b');
+    ctx.fillStyle = g; ctx.fillRect(jx, jy, js, js);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `bold ${Math.round(js * 0.26)}px ${FONT}`;
+    ctx.fillText((s.c === '公演曲' || /^(stg|ts)-/.test(s.j)) ? '公演' : '♪', jx + js / 2, jy + js / 2);
+  }
+  ctx.restore();
+  // 曲名・収録
+  const tx = jx + js + p.gap2, tw = w - (tx - x) - p.padR;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#333';
+  ctx.fillText(fitText(ctx, dispName(s.t), tw, p.ts, 'bold'), tx, y + h / 2 + p.ty);
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(fitText(ctx, dispSrc(s.s), tw, p.ss, 'normal', 0.8), tx, y + h / 2 + p.sy);
+}
+const TOP_CARD = { top: true, r: 22, lw: 6, pad: 22, bs: 110, gap: 20, gap2: 24, padR: 26, ts: 54, ss: 26, ty: 6, sy: 50 };
+
 async function drawResultImage(list) {
   const jackets = await Promise.all(list.map(s => loadJacket(s.j)));
-  const W = 1080, topH = 190, rowH = list.length > 10 ? 86 : 100, headH = 270;
-  const H = headH + topH + 16 + (list.length - 1) * (rowH + 12) + 70;
+  const wide = list.length > 16;   // 17曲以上は2列にして、100曲でも縦に長くなりすぎないようにする
+  const W = 1080, topH = wide ? 170 : 190, headH = 270;
+  const rowH = wide ? (list.length <= 40 ? 84 : 66) : (list.length > 10 ? 86 : 100), gapY = wide ? 8 : 12;
+  const rest = list.length - 1, rows = wide ? Math.ceil(rest / 2) : rest;
+  const H = headH + topH + 16 + rows * (rowH + gapY) - gapY + 70;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
@@ -1667,57 +1767,121 @@ async function drawResultImage(list) {
   ctx.fillStyle = '#999'; ctx.font = `28px ${FONT}`;
   ctx.fillText('楽曲ソートの結果', W / 2, 240);
 
-  const x = 70, w = W - 140;
-  let y = headH;
-  list.forEach((s, i) => {
-    const rank = finalRanks[i] || i + 1;
-    const top = i === 0;
-    const h = top ? topH : rowH;
-    // 枠
-    ctx.save();
-    ctx.shadowColor = 'rgba(224,69,123,.15)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
-    ctx.fillStyle = top ? '#fffaf2' : (rank <= 3 ? '#fffdf9' : '#fff');
-    roundRect(ctx, x, y, w, h, 22); ctx.fill();
-    ctx.restore();
-    ctx.lineWidth = top ? 6 : 3;
-    ctx.strokeStyle = rank === 1 ? '#e6b422' : rank <= 3 ? '#ffc58a' : '#f3e2cf';
-    roundRect(ctx, x, y, w, h, 22); ctx.stroke();
-    // 順位
-    const bs = top ? 110 : rowH - 30;
-    ctx.fillStyle = rank === 1 ? '#e6b422' : rank === 2 ? '#b5b5b5' : rank === 3 ? '#cd7f32' : '#e0457b';
-    roundRect(ctx, x + 22, y + (h - bs) / 2, bs, bs, bs / 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `bold ${Math.round(bs * (rank >= 10 ? 0.4 : 0.48))}px ${FONT}`;
-    ctx.fillText(rank + (top ? '位' : ''), x + 22 + bs / 2, y + h / 2 + 2);
-    // ジャケ写
-    const js = h - (top ? 36 : 22), jx = x + 22 + bs + 20, jy = y + (h - js) / 2;
-    ctx.save();
-    roundRect(ctx, jx, jy, js, js, 10); ctx.clip();
-    if (jackets[i]) {
-      const im = jackets[i], sz = Math.min(im.naturalWidth, im.naturalHeight);
-      ctx.drawImage(im, (im.naturalWidth - sz) / 2, (im.naturalHeight - sz) / 2, sz, sz, jx, jy, js, js);
-    } else {
-      const g = ctx.createLinearGradient(jx, jy, jx + js, jy + js);
-      g.addColorStop(0, '#f58fb3'); g.addColorStop(1, '#e0457b');
-      ctx.fillStyle = g; ctx.fillRect(jx, jy, js, js);
-      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = `bold ${Math.round(js * 0.26)}px ${FONT}`;
-      ctx.fillText((s.c === '公演曲' || /^(stg|ts)-/.test(s.j)) ? '公演' : '♪', jx + js / 2, jy + js / 2);
-    }
-    ctx.restore();
-    // 曲名・収録
-    const tx = jx + js + 24, tw = w - (tx - x) - 26;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#333';
-    const tt = fitText(ctx, dispName(s.t), tw, top ? 54 : (rowH > 90 ? 38 : 34), 'bold');
-    ctx.fillText(tt, tx, y + h / 2 + (top ? 6 : 2));
-    ctx.fillStyle = '#aaa';
-    const ss = fitText(ctx, dispSrc(s.s), tw, top ? 26 : 21, 'normal', 0.9);
-    ctx.fillText(ss, tx, y + h / 2 + (top ? 50 : 32));
-    y += h + (top ? 16 : 12);
-  });
-
+  const rankOf = i => finalRanks[i] || i + 1;
+  if (!wide) {
+    const x = 70, w = W - 140;
+    const rowP = { top: false, r: 22, lw: 3, shadow: 12, pad: 22, bs: rowH - 30, js: rowH - 22, gap: 20, gap2: 24, padR: 26,
+      ts: rowH > 90 ? 38 : 34, ss: 21, ty: 2, sy: 32 };
+    let y = headH;
+    list.forEach((s, i) => {
+      const top = i === 0, h = top ? topH : rowH;
+      drawCard(ctx, s, rankOf(i), jackets[i], x, y, w, h, top ? Object.assign({ js: h - 36 }, TOP_CARD) : rowP);
+      y += h + (top ? 16 : 12);
+    });
+    return c;
+  }
+  // 1位は大きく、2位から下は2列（左の列を上から下 → 右の列）
+  const x = 60, w = W - 120;
+  drawCard(ctx, list[0], rankOf(0), jackets[0], x, headH, w, topH, Object.assign({ js: topH - 36 }, TOP_CARD));
+  const big = rowH > 70, colGap = 14, cw = (w - colGap) / 2, y0 = headH + topH + 16;
+  const rowP = { top: false, r: 14, lw: 2, shadow: 6, pad: 10, bs: rowH - (big ? 30 : 24), js: rowH - 14, gap: 10, gap2: 12, padR: 12,
+    ts: big ? 28 : 23, ss: big ? 16 : 14, ty: big ? -2 : -3, sy: big ? 24 : 19 };
+  for (let i = 1; i < list.length; i++) {
+    const k = i - 1, col = k < rows ? 0 : 1, r = col ? k - rows : k;
+    drawCard(ctx, list[i], rankOf(i), jackets[i], x + col * (cw + colGap), y0 + r * (rowH + gapY), cw, rowH, rowP);
+  }
   return c;
+}
+
+/* ---------- 楽曲一覧 ---------- */
+let slGrp = 'all', slCat = 'all', slItems = [], slShown = 0, slObs = null;
+const SL_STEP = 150;
+function openSongList() {
+  showPhase(5);
+  window.scrollTo(0, 0);
+  buildSongListChips();
+  renderSongList();
+  // みんなのランキングの数字も出すため、まだ読んでいなければ裏で読み込む
+  if (STATS.csvUrl && !rkRows.length) loadRanking().then(() => { if (!document.getElementById('phase5').classList.contains('hidden')) renderSongList(true); });
+}
+function closeSongList() { modalStack = []; document.getElementById('song-modal').classList.add('hidden'); document.body.style.overflow = ''; showPhase(1); window.scrollTo(0, 0); }
+function buildSongListChips() {
+  const mk = (box, vals, cur, label, set, color) => {
+    box.innerHTML = '';
+    ['all', ...vals].forEach(v => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (color && v !== 'all' ? ' gchip' : '') + (cur === v ? ' on' : '');
+      if (color && v !== 'all') b.style.setProperty('--gc', GCOLOR[v]);
+      b.textContent = v === 'all' ? label : v;
+      b.onclick = () => { set(v); buildSongListChips(); renderSongList(); };
+      box.appendChild(b);
+    });
+  };
+  mk(document.getElementById('sl-grp'), GROUPS, slGrp, 'すべて', v => slGrp = v, true);
+  mk(document.getElementById('sl-cat'), CATS, slCat, 'すべての種類', v => slCat = v, false);
+}
+function renderSongList(keep) {
+  const norm = t => t.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  const q = norm(document.getElementById('sl-search').value || '');
+  slItems = SONGS.filter(s => (slGrp === 'all' || s.a === slGrp) && (slCat === 'all' || s.c === slCat) &&
+    (!q || norm(s.t).includes(q) || norm(dispName(s.t)).includes(q) || norm(s.s).includes(q) || norm(s.h).includes(q)));
+  document.getElementById('sl-total').textContent = `${slItems.length}曲` + (slItems.length !== SONGS.length ? `（全${SONGS.length}曲中）` : '');
+  const want = keep ? Math.max(slShown, SL_STEP) : SL_STEP;
+  slShown = 0; slLastG = null;
+  const box = document.getElementById('sl-list');
+  box.innerHTML = slItems.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
+  slMore(want);
+}
+let slLastG = null;
+function slMore(n) {
+  const box = document.getElementById('sl-list');
+  const old = box.querySelector('.sl-more'); if (old) old.remove();
+  if (slObs) { slObs.disconnect(); slObs = null; }
+  const { st, ptRank } = rkStats();
+  const end = Math.min(slItems.length, slShown + (n || SL_STEP));
+  for (let i = slShown; i < end; i++) {
+    const s = slItems[i];
+    if (s.g !== slLastG) {
+      slLastG = s.g;
+      const head = document.createElement('div'); head.className = 'group-head';
+      head.appendChild(jacketEl(s.j));
+      const hl = document.createElement('span'); hl.className = 'hl';
+      const cat = document.createElement('span'); cat.className = 'cat'; cat.style.background = GCOLOR[s.a]; cat.textContent = s.a;
+      hl.append(cat, ' ', dispSrc(s.h));
+      head.appendChild(hl);
+      box.appendChild(head);
+    }
+    const row = document.createElement('div'); row.className = 'sl-row';
+    const cat = document.createElement('span'); cat.className = 'sl-cat'; cat.textContent = s.c;
+    const nm = document.createElement('div'); nm.className = 'nm';
+    const b = document.createElement('button'); b.className = 'song-open'; b.type = 'button';
+    b.appendChild(document.createTextNode(dispName(s.t)));
+    const more = document.createElement('span'); more.className = 'more'; more.textContent = '詳しく ›'; b.appendChild(more);
+    b.onclick = e => openSongModal(s, false, e);
+    nm.appendChild(b);
+    if (rkRows.length) {
+      const x = st.get(s);
+      const sub = document.createElement('div'); sub.className = 'rk-stats';
+      sub.innerHTML = x ? `<span>みんなの順位 <b>${ptRank.get(s)}</b>位</span><span>1位 <b>${x.first}</b>回</span><span>TOP16入り <b>${x.in}</b>回</span>`
+        : '<span>まだTOP16に選ばれていません</span>';
+      nm.appendChild(sub);
+    }
+    nm.appendChild(listenLink(s));
+    row.append(cat, nm);
+    box.appendChild(row);
+  }
+  slShown = end;
+  if (slShown < slItems.length) {
+    const btn = document.createElement('button'); btn.className = 'btn-wide btn-light sl-more';
+    btn.textContent = `もっと見る（残り${slItems.length - slShown}曲）`;
+    btn.onclick = () => slMore();
+    box.appendChild(btn);
+    // 下までスクロールしたら自動で続きを出す
+    if ('IntersectionObserver' in window) {
+      slObs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) slMore(); }, { rootMargin: '600px 0px' });
+      slObs.observe(btn);
+    }
+  }
 }
 
 /* ---------- 保存・投稿 ---------- */
@@ -1789,7 +1953,7 @@ function restart() {
   // 前回の選択を復元し、途中のソートがあれば「続きから」を出す
   const s = readSaved(SEL_KEY);
   if (s) {
-    if ([7, 10, 16].includes(s.top)) TOP_N = s.top;
+    if (validTop(s.top)) TOP_N = s.top;
     (s.sel || []).forEach(i => { if (SONG_BY_ID[i]) selected.add(i); });
   }
   const d = loadProgress();
@@ -1803,6 +1967,7 @@ function restart() {
 })();
 buildGroupChips();
 buildChips();
+buildTopSelect();
 setTop(TOP_N);
 renderList();
 showPhase(1);
