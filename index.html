@@ -212,16 +212,15 @@
   .msort-l { font-size: 11px; color: #999; font-weight: bold; white-space: nowrap; }
   .msort-b { flex: 1; min-width: 0; padding: 7px 0; font-size: 12px; border-radius: 999px; background: #fff; color: var(--main-dark); border: 1.5px solid var(--line); white-space: nowrap; }
   .msort-b.on { background: var(--main); border-color: var(--main); color: #fff; }
-  .share-ov { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
-  @media (min-width: 768px) { .share-ov { align-items: center; } }
-  .share-card { background: #fff; border-radius: 20px; padding: 18px 16px 12px; width: 100%; max-width: 400px; display: grid; gap: 8px; animation: whoPop .3s ease; }
-  .share-h { margin: 0 0 4px; font-weight: 900; font-size: 16px; text-align: center; color: #333; }
-  .share-note { margin: 0; font-size: 11px; color: #999; text-align: center; }
-  .share-btn { width: 100%; padding: 13px; border-radius: 14px; font-size: 15px; text-align: center; }
-  .share-btn.main { background: var(--main); color: #fff; }
-  .share-btn.line { background: #06c755; color: #fff; }
-  .share-btn.sub { background: var(--sub); color: var(--main-dark); }
-  .share-btn.cancel { background: none; color: #999; font-weight: normal; }
+  .share-ov { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 20px 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .share-card { background: #fff; border-radius: 20px; padding: 18px 16px 10px; width: 100%; max-width: 400px; margin: auto; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  .share-h { margin: 0 0 12px; font-weight: 900; font-size: 16px; text-align: center; color: #333; }
+  .share-note { margin: 0 0 10px; font-size: 11px; color: #999; text-align: center; }
+  .share-card .share-btn { display: block; width: 100%; min-height: 48px; margin: 0 0 8px; padding: 13px 10px; border: 0; border-radius: 14px; font-size: 15px; font-weight: bold; line-height: 1.3; text-align: center; -webkit-appearance: none; appearance: none; }
+  .share-card .share-btn.main { background: #e0457b; color: #fff; }
+  .share-card .share-btn.line { background: #06c755; color: #fff; }
+  .share-card .share-btn.sub { background: #ffe6ef; color: #b8255a; }
+  .share-card .share-btn.cancel { background: transparent; color: #999; font-weight: normal; margin: 0; }
   .who-ov { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: whoIn .25s ease; }
   .who-card { background: #fff; border-radius: 22px; padding: 28px 22px 22px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.25); animation: whoPop .45s cubic-bezier(.2,1.6,.4,1); }
   .who-emoji { font-size: 56px; line-height: 1; }
@@ -2566,6 +2565,7 @@ async function shareImage(blob, name, text) {
 /* 共有のしかたを選ぶ画面（LINEなどで「画像＋リンク」を送れるように）。ボタンを押した瞬間に共有するので、スマホでも確実に開く */
 function openShareSheet(o) {
   const old = document.querySelector('.share-ov'); if (old) old.remove();
+  try { document.getElementById('toast').classList.remove('show'); } catch (e) {}
   const ov = document.createElement('div'); ov.className = 'share-ov';
   const card = document.createElement('div'); card.className = 'share-card'; ov.appendChild(card);
   const h = document.createElement('p'); h.className = 'share-h'; h.textContent = '共有する'; card.appendChild(h);
