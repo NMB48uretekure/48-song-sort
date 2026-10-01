@@ -207,6 +207,11 @@
   .mems .chips { justify-content: flex-start; margin: 0; gap: 5px; }
   .mchip { padding: 4px 9px; font-size: 12px; border-radius: 999px; background: #fff; color: #333; border: 1.5px solid var(--line); font-weight: bold; }
   .mchip:active { opacity: .6; }
+  /* メンバーの並び順：1行のスイッチ */
+  .msort { display: flex; align-items: center; gap: 6px; margin: 10px 0 12px; }
+  .msort-l { font-size: 11px; color: #999; font-weight: bold; white-space: nowrap; }
+  .msort-b { flex: 1; min-width: 0; padding: 7px 0; font-size: 12px; border-radius: 999px; background: #fff; color: var(--main-dark); border: 1.5px solid var(--line); white-space: nowrap; }
+  .msort-b.on { background: var(--main); border-color: var(--main); color: #fff; }
   .share-ov { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
   @media (min-width: 768px) { .share-ov { align-items: center; } }
   .share-card { background: #fff; border-radius: 20px; padding: 18px 16px 12px; width: 100%; max-width: 400px; display: grid; gap: 8px; animation: whoPop .3s ease; }
@@ -2171,6 +2176,7 @@ function openSongList() {
 function closeSongList() { closeModalNow(); showPhase(1); window.scrollTo(0, 0); }
 function setSlMode(m) {
   slMode = m;
+  document.getElementById('sl-search').placeholder = m === 'mem' ? '名前・県名で検索' : '曲名・メンバー名で検索';
   document.querySelectorAll('[data-sl]').forEach(b => b.classList.toggle('active', b.dataset.sl === m));
   buildSongListChips();
   renderSongList();
@@ -2341,11 +2347,13 @@ function kanaRow(r) {
 function buildMemSortChips() {
   const box = document.getElementById('sl-msort');
   box.innerHTML = '';
+  box.className = slMode === 'mem' ? 'msort' : 'chips';
   if (slMode !== 'mem') return;
+  const lb = document.createElement('span'); lb.className = 'msort-l'; lb.textContent = '並び順'; box.appendChild(lb);
   MSORTS.forEach(([k, label]) => {
     const b = document.createElement('button');
-    b.className = 'chip' + (slMemSort === k ? ' on' : '');
-    b.textContent = label;
+    b.className = 'msort-b' + (slMemSort === k ? ' on' : '');
+    b.textContent = label.replace(/順$/, '');
     b.onclick = () => { slMemSort = k; buildMemSortChips(); renderSongList(); };
     box.appendChild(b);
   });
@@ -2367,7 +2375,7 @@ function renderMemberList(q, year) {
   const D = year ? year + '-01-01' : null;
   const inTen = i => D && MEM_TEN[i].some(([g, j, l]) => inGrp(g) && j <= D && (!l || l >= D));
   slMemItems = MEMBERS.map((m, i) => [i, cnt(i)]).filter(([i, c]) => ((c > 0 && inGrp(MEMBERS[i][1])) || inTen(i)) &&
-    (!q || slNorm(MEMBERS[i][0]).includes(q) || slNorm(MEMBERS[i][2]).includes(q) || (slMemSort === 'pref' && MEMBERS[i][7] && slNorm(MEMBERS[i][7]).includes(q))));
+    (!q || slNorm(MEMBERS[i][0]).includes(q) || slNorm(MEMBERS[i][2]).includes(q) || (MEMBERS[i][7] && q.length >= 2 && slNorm(MEMBERS[i][7]).includes(q))));
   const rd = i => MEMBERS[i][2] || '\uffff' + MEMBERS[i][0];
   const kanaCmp = (a, b) => rd(a).localeCompare(rd(b), 'ja');
   const gcmp = (a, b) => slGrps.size !== 1 ? GROUPS.indexOf(MEMBERS[a[0]][1]) - GROUPS.indexOf(MEMBERS[b[0]][1]) : 0;
