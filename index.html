@@ -165,7 +165,7 @@
   .top-choice.active small { color: #ffe3ee; }
   .top-custom { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 10px; padding: 10px 12px; margin: 0 0 10px;
     border-radius: 12px; background: #fff; border: 2px solid var(--line); color: var(--main-dark); cursor: pointer; }
-  .top-custom .tc-l { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 17px; }
+  .top-custom .tc-l { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 17px; white-space: nowrap; }
   .top-custom small { font-size: 10px; color: #999; }
   .top-custom select { font: inherit; font-size: 16px; font-weight: bold; color: var(--main-dark); background: #fff; border: 2px solid var(--line);
     border-radius: 10px; padding: 6px 30px 6px 12px; -webkit-appearance: none; appearance: none; cursor: pointer;
@@ -343,8 +343,8 @@
       <button class="top-choice" data-top="16" onclick="setTop(16)"><b>TOP16</b><small>1〜16位を決める</small></button>
     </div>
     <div class="top-custom" id="top-custom" onclick="openTopPicker(event)">
-      <span class="tc-l">TOP<select id="top-select" onchange="setTop(Number(this.value))" aria-label="何位まで決めるか（17〜100位）"></select>まで決める</span>
-      <small>17〜100位から自由に選べます</small>
+      <span class="tc-l"><span id="tc-pre">TOP</span><select id="top-select" onchange="setTop(Number(this.value))" aria-label="何位まで決めるか（17〜100位・全曲）"></select><span id="tc-post">まで決める</span></span>
+      <small>17〜100位、または選んだ曲の全部（全曲）から選べます</small>
     </div>
   </div>
   <p class="pick-label list-label"><span class="step">4</span>好きな曲をタップして選んでください</p>
@@ -1610,7 +1610,7 @@ function buildTopSelect() {
   const sel = document.getElementById('top-select');
   sel.innerHTML = '<option value="" disabled>数を選ぶ</option>';
   for (let n = 17; n <= 100; n++) sel.add(new Option(n + '位', n));
-  sel.add(new Option('全部（選んだ曲すべて）', TOP_ALL));
+  sel.add(new Option('全曲', TOP_ALL));
 }
 // 17〜100位は、ボタンの枠のどこを押しても選択肢（ピッカー）が開くようにする
 function openTopPicker(e) {
@@ -1625,6 +1625,8 @@ function setTop(n) {
   document.querySelectorAll('[data-top]').forEach(b => b.classList.toggle('active', Number(b.dataset.top) === n));
   document.getElementById('top-custom').classList.toggle('active', n > 16);
   document.getElementById('top-select').value = n > 16 ? String(n) : '';
+  document.getElementById('tc-pre').textContent = n === TOP_ALL ? '' : 'TOP';
+  document.getElementById('tc-post').textContent = n === TOP_ALL ? 'の順位を決める' : 'まで決める';
   updateBar();
 }
 
