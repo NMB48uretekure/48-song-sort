@@ -3026,7 +3026,7 @@ async function drawRankCard() {
   const d = new Date();
   ctx.fillStyle = '#777'; ctx.font = `500 24px ${FONT}`;
   ctx.fillText(`${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} 時点・${rkRows.length}件の結果から集計`, W / 2, 192);
-  const jk = await Promise.all(items.map(it => loadJacket(songKey(it.s)).catch(() => null)));
+  const jk = await Promise.all(items.map(it => loadJacket(it.s.j).catch(() => null)));
   const colW = (W - pad * 2 - gap * (cols - 1)) / cols;
   items.forEach((it, i) => {
     const c = Math.floor(i / per), r = i % per;
