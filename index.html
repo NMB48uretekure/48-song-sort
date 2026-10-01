@@ -208,11 +208,20 @@
   .mchip { padding: 4px 9px; font-size: 12px; border-radius: 999px; background: #fff; color: #333; border: 1.5px solid var(--line); font-weight: bold; }
   .mchip:active { opacity: .6; }
   /* メンバーの並び順：1行のスイッチ */
+  /* iPhoneのセグメントのように、選んだ位置へ「つまみ」がヌルっと動く */
+  .slide-seg { position: relative; isolation: isolate; touch-action: pan-y; }
+  .slide-seg > .seg-thumb { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; background: var(--main); pointer-events: none;
+    box-shadow: 0 2px 8px rgba(224,69,123,.28); transition: transform .38s cubic-bezier(.25,1.3,.45,1), width .38s cubic-bezier(.25,1.3,.45,1), height .3s, opacity .2s; will-change: transform; }
+  .slide-seg.dragging > .seg-thumb { transition: none; transform-origin: center; }
+  .slide-seg > button { position: relative; z-index: 1; background: transparent !important; transition: color .25s; -webkit-tap-highlight-color: transparent; }
+  .slide-seg > button:active { transform: none; }
+  @media (prefers-reduced-motion: reduce) { .slide-seg > .seg-thumb { transition: none; } }
   .mpanel { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 10px; margin: 12px 0 14px; padding: 10px 12px; background: #fff7fa; border: 1.5px solid var(--line); border-radius: 14px; }
   .mp-l { font-size: 11px; font-weight: bold; color: #b07890; white-space: nowrap; }
   .mp-seg { display: flex; background: #fff; border: 1.5px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; min-width: 0; }
   .mp-b { flex: 1; min-width: 0; padding: 6px 0; font-size: 12px; border-radius: 999px; background: transparent; color: var(--main-dark); white-space: nowrap; letter-spacing: -.03em; }
-  .mp-b.on { background: var(--main); color: #fff; }
+  .mp-b.on { color: #fff; }
+  .mp-seg:not(.slide-seg) .mp-b.on { background: var(--main); }
   .mp-seg.six .mp-b { font-size: 11.5px; }
   .msort { display: grid; grid-template-columns: repeat(6, 1fr); align-items: center; gap: 5px; margin: 10px 0 12px; }
   .msort .msort-l { grid-column: 1 / -1; text-align: center; }
@@ -1860,6 +1869,7 @@ function showPhase(n) {
   nav.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === cur));
   if (n === 1) refreshResume(); else document.getElementById('resume-box').classList.add('hidden');
   document.getElementById('sticky-bar').classList.toggle('hidden', n !== 1);
+  requestAnimationFrame(() => document.querySelectorAll('.slide-seg').forEach(x => x._seg && x._seg(false)));
 }
 
 function startSort() {
@@ -2404,25 +2414,47 @@ function kanaRow(r) {
 }
 function buildMemSortChips() {
   const box = document.getElementById('sl-msort');
-  box.innerHTML = '';
   const d0 = document.getElementById('sl-mdir'); if (d0) { d0.innerHTML = ''; d0.classList.add('hidden'); }
-  box.className = slMode === 'mem' ? 'mpanel' : 'chips';
-  if (slMode !== 'mem') return;
+  if (slMode !== 'mem') { box.innerHTML = ''; box.className = 'chips'; box._built = false; return; }
+  const DIRS = { count: [['desc', '多い順'], ['asc', '少ない順']], career: [['desc', '長い順'], ['asc', '短い順']] };
+  const sync = () => {
+    box.querySelectorAll('[data-k]').forEach(b => {
+      const [grp, k] = b.dataset.k.split(':');
+      const v = grp === 'st' ? slMemStatus : grp === 'so' ? slMemSort : slMemDir;
+      b.classList.toggle('on', v === k);
+    });
+    const dl = box.querySelector('.mp-dir-l'), ds = box.querySelector('.mp-dir');
+    const dd = DIRS[slMemSort];
+    dl.classList.toggle('hidden', !dd); ds.classList.toggle('hidden', !dd);
+    if (dd) { dl.textContent = slMemSort === 'count' ? '曲数' : '芸歴'; [...ds.querySelectorAll('button')].forEach((b, n) => b.textContent = dd[n][1]); }
+  };
+  if (box._built) { sync(); return; }
+  box.innerHTML = ''; box.className = 'mpanel'; box._built = true;
   // 1行＝「ラベル｜切り替え」。在籍・並び順・順番をそろえて並べる
-  const row = (label, items, cur, onPick, cls) => {
-    const l = document.createElement('div'); l.className = 'mp-l'; l.textContent = label;
-    const seg = document.createElement('div'); seg.className = 'mp-seg ' + (cls || '');
+  const row = (label, grp, items, cls) => {
+    const l = document.createElement('div'); l.className = 'mp-l' + (grp === 'di' ? ' mp-dir-l' : ''); l.textContent = label;
+    const seg = document.createElement('div'); seg.className = 'mp-seg ' + (cls || '') + (grp === 'di' ? ' mp-dir' : '');
     items.forEach(([k, t]) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'mp-b' + (cur === k ? ' on' : ''); b.textContent = t;
-      b.onclick = () => onPick(k); seg.appendChild(b);
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mp-b'; b.textContent = t; b.dataset.k = grp + ':' + k;
+      b.onclick = () => {
+        if (grp === 'st') slMemStatus = k;
+        else if (grp === 'so') { if (slMemSort !== k) slMemDir = 'desc'; slMemSort = k; }
+        else slMemDir = k;
+        sync();
+        setTimeout(() => renderSongList(), 0);   // つまみが動き出してから一覧を作り直す
+      };
+      seg.appendChild(b);
     });
     box.append(l, seg);
+    return seg;
   };
-  const redo = () => { buildMemSortChips(); renderSongList(); };
-  row('在籍', [['all', 'すべて'], ['cur', '現役'], ['grad', '卒業生']], slMemStatus, k => { slMemStatus = k; redo(); });
-  row('並び順', MSORTS.map(([k, t]) => [k, t.replace(/順$/, '')]), slMemSort, k => { if (slMemSort !== k) slMemDir = 'desc'; slMemSort = k; redo(); }, 'six');
-  const DIRS = { count: [['desc', '多い順'], ['asc', '少ない順']], career: [['desc', '長い順'], ['asc', '短い順']] };
-  if (DIRS[slMemSort]) row(slMemSort === 'count' ? '曲数' : '芸歴', DIRS[slMemSort], slMemDir, k => { slMemDir = k; redo(); });
+  const segs = [
+    row('在籍', 'st', [['all', 'すべて'], ['cur', '現役'], ['grad', '卒業生']]),
+    row('並び順', 'so', MSORTS.map(([k, t]) => [k, t.replace(/順$/, '')]), 'six'),
+    row('曲数', 'di', [['desc', '多い順'], ['asc', '少ない順']]),
+  ];
+  sync();
+  segs.forEach(attachSeg);
 }
 function memHead(i) {
   const [, g, r, ki, , , bd] = MEMBERS[i];
@@ -2834,6 +2866,58 @@ async function shareToX() {
   showToast('先に画像を保存して、Xの投稿画面で添付してください');
   setTimeout(() => { const w = window.open(url, '_blank'); if (!w) location.href = url; }, 900);
 }
+/* セグメント（タブ）のつまみ：選ばれているボタン（.on / .active）の下に動く。指でつまんで横にスライドもできる */
+function attachSeg(seg) {
+  if (!seg || seg._seg) { if (seg && seg._seg) seg._seg(false); return; }
+  seg.classList.add('slide-seg');
+  const th = document.createElement('span'); th.className = 'seg-thumb'; seg.prepend(th);
+  const btns = () => [...seg.children].filter(x => x.tagName === 'BUTTON' && x.offsetParent !== null);
+  const cur = () => btns().find(x => x.classList.contains('on') || x.classList.contains('active'));
+  const place = anim => {
+    const b = cur();
+    if (!b) { th.style.opacity = 0; return; }
+    if (!anim) th.style.transition = 'none';
+    th.style.opacity = 1; th.style.width = b.offsetWidth + 'px'; th.style.height = b.offsetHeight + 'px';
+    th.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`;
+    if (!anim) { void th.offsetWidth; th.style.transition = ''; }
+  };
+  seg._seg = place;
+  // ボタンの .on / .active が変わったら、つまみを動かす
+  new MutationObserver(() => requestAnimationFrame(() => place(true))).observe(seg, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true });
+  // 指（マウス）でつまんでスライド
+  let drag = null;
+  seg.addEventListener('pointerdown', e => {
+    const b = cur(); const bs = btns();
+    if (!b || !bs.every(x => x.offsetTop === bs[0].offsetTop)) return;   // 2段のときはスライドなし
+    if (e.target.closest('button') !== b) return;                          // 選ばれているボタンをつまんだときだけ
+    drag = { x0: e.clientX, left0: b.offsetLeft, w: b.offsetWidth, moved: false, id: e.pointerId };
+  });
+  seg.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x0;
+    if (!drag.moved && Math.abs(dx) < 6) return;
+    if (!drag.moved) { drag.moved = true; seg.classList.add('dragging'); try { seg.setPointerCapture(e.pointerId); } catch (er) {} }
+    const bs = btns(), min = bs[0].offsetLeft, max = bs[bs.length - 1].offsetLeft + bs[bs.length - 1].offsetWidth - drag.w;
+    const x = Math.max(min, Math.min(max, drag.left0 + dx));
+    th.style.transform = `translate(${x}px, ${cur().offsetTop}px) scale(1.04)`;
+    drag.x = x;
+  });
+  const end = e => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    seg.classList.remove('dragging');
+    if (!d.moved) return;
+    e.preventDefault();
+    const mid = d.x + d.w / 2;
+    const near = btns().reduce((a, b) => Math.abs(b.offsetLeft + b.offsetWidth / 2 - mid) < Math.abs(a.offsetLeft + a.offsetWidth / 2 - mid) ? b : a);
+    seg._suppress = true; setTimeout(() => seg._suppress = false, 50);
+    if (near === cur()) place(true); else near.click();
+  };
+  seg.addEventListener('pointerup', end); seg.addEventListener('pointercancel', end);
+  seg.addEventListener('click', e => { if (seg._suppress && e.isTrusted) { e.stopPropagation(); e.preventDefault(); } }, true);
+  window.addEventListener('resize', () => place(false));
+  requestAnimationFrame(() => place(false));
+}
 const IS_MOUSE = (() => { try { return matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (e) { return false; } })();
 if (IS_MOUSE) { const h = document.getElementById('save-hint'); if (h) h.textContent = '画像を右クリックしても保存できます'; }
 function showWhoAreYou() {
@@ -2895,6 +2979,7 @@ function goHomeFromSort() {
     (s.sel || []).forEach(i => { if (SONG_BY_ID[i]) selected.add(i); });
   }
 })();
+['mainnav', 'sl-mode', 'rk-kind'].forEach(id => attachSeg(document.getElementById(id)));
 buildGroupChips();
 buildChips();
 buildTopSelect();
