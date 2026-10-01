@@ -293,6 +293,31 @@
   .prog { height: 6px; border-radius: 3px; background: var(--sub); overflow: hidden; margin: 2px 0 0; }
   .prog i { display: block; height: 100%; width: 0; background: var(--main); transition: width .25s; }
   .vs-text { align-self: center; font-size: 18px; font-weight: bold; color: var(--main); }
+  .key-hint { display: none; font-size: 11px; color: #aaa; margin: 10px 0 0; }
+  .key-hint kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1px solid #ddd; border-bottom-width: 2px; border-radius: 5px; background: #fafafa; color: #666; font-family: inherit; font-size: 11px; }
+  /* タブレット・パソコン：横幅を広げて、ジャケットや文字も大きく */
+  @media (min-width: 768px) {
+    .step-container, .mainnav, .site-note, .sticky-inner { max-width: 640px; }
+    .battle-container { gap: 18px; margin: 22px 0; }
+    .battle-card { min-height: 230px; padding: 18px 14px; }
+    .battle-card .jk, .battle-card .jk-ph { max-width: 210px; }
+    .battle-card .t { font-size: 21px; }
+    .battle-card .s { font-size: 12px; }
+    .vs-text { font-size: 22px; }
+    #song-modal .mcard { max-width: 560px; }
+  }
+  @media (min-width: 1100px) {
+    .step-container, .mainnav, .site-note, .sticky-inner { max-width: 720px; }
+    .battle-card .jk, .battle-card .jk-ph { max-width: 240px; }
+  }
+  /* マウスで操作するとき：カーソルを乗せると反応する・キーボード操作の案内を出す */
+  @media (hover: hover) and (pointer: fine) {
+    .battle-card { transition: transform .12s, border-color .12s, box-shadow .12s; }
+    .battle-card:hover { transform: translateY(-3px); border-color: var(--main); box-shadow: 0 6px 18px rgba(224,69,123,.18); }
+    button:not(:disabled):hover { filter: brightness(1.06); }
+    .chip:hover, .mchip:hover { filter: brightness(.97); }
+    .key-hint { display: block; }
+  }
   .draw-btn { margin: 4px auto 12px; font-size: 15px; }
 
   .result-img-wrap { position: relative; margin: 6px 0 4px; }
@@ -372,6 +397,7 @@
     <button id="undo-btn" class="btn-secondary btn-small" onclick="undo()" disabled>ひとつ戻る</button>
     <button class="btn-light btn-small" onclick="goHomeFromSort()">ホームに戻る</button>
   </div>
+  <p class="key-hint">キーボードでも選べます：<kbd>←</kbd> 左　<kbd>→</kbd> 右　<kbd>↓</kbd> 引き分け　<kbd>Z</kbd> ひとつ戻る</p>
 </div>
 
 <!-- 結果 -->
@@ -384,7 +410,7 @@
   </div>
   <div id="result-more"></div>
   <p class="help" id="result-pages"></p>
-  <p class="help">画像を長押ししても保存できます</p>
+  <p class="help" id="save-hint">画像を長押ししても保存できます</p>
   <button class="btn-wide btn-twitter" onclick="shareToX()">𝕏 に画像つきで投稿する</button>
   <button class="btn-wide" onclick="saveImage()">画像を保存する</button>
   <div id="first-notice" class="first-notice hidden"></div>
@@ -1265,7 +1291,17 @@ function renderSongModal() {
   }
   card.appendChild(w);
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSongModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeSongModal(); return; }
+  // バトル中はキーボードでも選べる（パソコン用）
+  if (document.getElementById('phase2').classList.contains('hidden') || modalStack.length || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^(input|textarea|select)$/i.test((e.target && e.target.tagName) || '')) return;
+  const k = e.key;
+  if (k === 'ArrowLeft' || k === '1') { e.preventDefault(); selectWinner(0); }
+  else if (k === 'ArrowRight' || k === '2') { e.preventDefault(); selectWinner(1); }
+  else if (k === 'ArrowDown' || k === 'ArrowUp' || k === ' ' || k === '3') { e.preventDefault(); selectWinner(2); }
+  else if (k === 'z' || k === 'Z' || k === 'Backspace') { e.preventDefault(); if (!document.getElementById('undo-btn').disabled) undo(); }
+});
 // 検索：曲名で絞った一覧（押すと詳細ポップアップ）
 function renderRankSearch(q, byKey) {
   const nq = slNorm(q);
@@ -2400,7 +2436,7 @@ async function saveImage() {
     const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
     if (dl) {
       try { const fs = resultFiles(); for (const f of fs) await dl.save({ filename: f.name, data: f }); showToast(fs.length > 1 ? `画像を${fs.length}枚保存しました` : '画像を保存しました'); }
-      catch (e) { if (!e || e.code !== 'declined') showToast('保存できないときは、画像を長押しして保存してください'); }
+      catch (e) { if (!e || e.code !== 'declined') showToast(IS_MOUSE ? '保存できないときは、画像を右クリックして保存してください' : '保存できないときは、画像を長押しして保存してください'); }
       return;
     }
   } catch (e) {}
@@ -2412,7 +2448,7 @@ async function saveImage() {
       document.body.appendChild(a); a.click(); a.remove();
     });
   } catch (e) {}
-  showToast('保存できないときは、画像を長押しして保存してください');
+  showToast(IS_MOUSE ? '保存できないときは、画像を右クリックして保存してください' : '保存できないときは、画像を長押しして保存してください');
 }
 // 曲の情報を画像にしてシェア（ポップアップの中身から歌唱メンバーを除いたもの）
 async function drawSongCard(s) {
@@ -2648,6 +2684,8 @@ async function shareToX() {
   showToast('先に画像を保存して、Xの投稿画面で添付してください');
   setTimeout(() => { const w = window.open(url, '_blank'); if (!w) location.href = url; }, 900);
 }
+const IS_MOUSE = (() => { try { return matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (e) { return false; } })();
+if (IS_MOUSE) { const h = document.getElementById('save-hint'); if (h) h.textContent = '画像を右クリックしても保存できます'; }
 function showWhoAreYou() {
   const ov = document.createElement('div'); ov.className = 'who-ov';
   ov.innerHTML = `<div class="who-card"><div class="who-emoji">😳</div><p class="who-big">あなたは何者ですか？</p><p class="who-sub">全${SONGS.length}曲の順位を最後まで決めました。<br>おつかれさまでした！</p><button type="button">閉じる</button></div>`;
