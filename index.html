@@ -208,6 +208,12 @@
   .mchip { padding: 4px 9px; font-size: 12px; border-radius: 999px; background: #fff; color: #333; border: 1.5px solid var(--line); font-weight: bold; }
   .mchip:active { opacity: .6; }
   /* メンバーの並び順：1行のスイッチ */
+  .mpanel { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 10px; margin: 12px 0 14px; padding: 10px 12px; background: #fff7fa; border: 1.5px solid var(--line); border-radius: 14px; }
+  .mp-l { font-size: 11px; font-weight: bold; color: #b07890; white-space: nowrap; }
+  .mp-seg { display: flex; background: #fff; border: 1.5px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; min-width: 0; }
+  .mp-b { flex: 1; min-width: 0; padding: 6px 0; font-size: 12px; border-radius: 999px; background: transparent; color: var(--main-dark); white-space: nowrap; letter-spacing: -.03em; }
+  .mp-b.on { background: var(--main); color: #fff; }
+  .mp-seg.six .mp-b { font-size: 11.5px; }
   .msort { display: grid; grid-template-columns: repeat(6, 1fr); align-items: center; gap: 5px; margin: 10px 0 12px; }
   .msort .msort-l { grid-column: 1 / -1; text-align: center; }
   .msort-l { font-size: 11px; color: #999; font-weight: bold; white-space: nowrap; }
@@ -1227,7 +1233,9 @@ function memTenureLines(i) {
   if (ten.length && ten.every(t => t[2])) { const last = ten.map(t => t[2]).sort().pop(); out.push(`${fmtDate(last)}に卒業`); }
   return out;
 }
-const memGraduated = i => { const ten = MEM_TEN[i] || []; return ten.length > 0 && ten.every(t => t[2]); };
+const memGraduated = i => { const ten = MEM_TEN[i] || []; return (ten.length > 0 && ten.every(t => t[2])) || MEMBERS[i][1] === 'SDN48'; };
+// 現役／卒業生（在籍期間が分からない人はどちらにも入れない）
+const memStatus = i => memGraduated(i) ? 'grad' : (MEM_TEN[i] || []).length ? 'cur' : '';
 // メンバーが歌っている曲をまとめて選んで、ソートの画面へ
 function sortMemberSongs(i) {
   const songs = MEM_SONGS[i];
@@ -2366,7 +2374,7 @@ function slAddMore(box, rest, fn) {
   }
 }
 // メンバーで見る：グループごとのメンバー一覧（歌っている曲が多い順）
-let slMemItems = [], slMemShown = 0, slMemSort = 'count', slMemDir = 'desc', slMemLastHead = null, slMemMatch = new Map(), slMemSplit = '';
+let slMemItems = [], slMemShown = 0, slMemSort = 'count', slMemDir = 'desc', slMemStatus = 'all', slMemLastHead = null, slMemMatch = new Map(), slMemSplit = '';
 const MSORTS = [['count', '曲数順'], ['ki', '期生順'], ['kana', '五十音順'], ['age', '年齢順'], ['pref', '出身地順'], ['career', '芸歴順']];
 // 芸歴：48グループに在籍していた日数の合計（兼任などで重なる期間は1回だけ数える）。在籍中の人は今日まで
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -2397,27 +2405,24 @@ function kanaRow(r) {
 function buildMemSortChips() {
   const box = document.getElementById('sl-msort');
   box.innerHTML = '';
-  box.className = slMode === 'mem' ? 'msort' : 'chips';
-  if (slMode !== 'mem') { const d = document.getElementById('sl-mdir'); if (d) { d.innerHTML = ''; d.classList.add('hidden'); } return; }
-  const lb = document.createElement('span'); lb.className = 'msort-l'; lb.textContent = '並び順'; box.appendChild(lb);
-  MSORTS.forEach(([k, label]) => {
-    const b = document.createElement('button');
-    b.className = 'msort-b' + (slMemSort === k ? ' on' : '');
-    b.textContent = label.replace(/順$/, '');
-    b.onclick = () => { if (slMemSort !== k) slMemDir = 'desc'; slMemSort = k; buildMemSortChips(); renderSongList(); };
-    box.appendChild(b);
-  });
-  // 曲数順のときだけ：多い順／少ない順の切り替え
-  const dir = document.getElementById('sl-mdir');
-  dir.innerHTML = '';
-  const DIRS = { count: [['desc', '曲が多い順'], ['asc', '曲が少ない順']], career: [['desc', '芸歴が長い順'], ['asc', '芸歴が短い順']] };
-  dir.classList.toggle('hidden', !DIRS[slMemSort]);
-  if (DIRS[slMemSort]) DIRS[slMemSort].forEach(([k, label]) => {
-    const b = document.createElement('button'); b.type = 'button';
-    b.className = 'chip' + (slMemDir === k ? ' on' : ''); b.textContent = label;
-    b.onclick = () => { slMemDir = k; buildMemSortChips(); renderSongList(); };
-    dir.appendChild(b);
-  });
+  const d0 = document.getElementById('sl-mdir'); if (d0) { d0.innerHTML = ''; d0.classList.add('hidden'); }
+  box.className = slMode === 'mem' ? 'mpanel' : 'chips';
+  if (slMode !== 'mem') return;
+  // 1行＝「ラベル｜切り替え」。在籍・並び順・順番をそろえて並べる
+  const row = (label, items, cur, onPick, cls) => {
+    const l = document.createElement('div'); l.className = 'mp-l'; l.textContent = label;
+    const seg = document.createElement('div'); seg.className = 'mp-seg ' + (cls || '');
+    items.forEach(([k, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mp-b' + (cur === k ? ' on' : ''); b.textContent = t;
+      b.onclick = () => onPick(k); seg.appendChild(b);
+    });
+    box.append(l, seg);
+  };
+  const redo = () => { buildMemSortChips(); renderSongList(); };
+  row('在籍', [['all', 'すべて'], ['cur', '現役'], ['grad', '卒業生']], slMemStatus, k => { slMemStatus = k; redo(); });
+  row('並び順', MSORTS.map(([k, t]) => [k, t.replace(/順$/, '')]), slMemSort, k => { if (slMemSort !== k) slMemDir = 'desc'; slMemSort = k; redo(); }, 'six');
+  const DIRS = { count: [['desc', '多い順'], ['asc', '少ない順']], career: [['desc', '長い順'], ['asc', '短い順']] };
+  if (DIRS[slMemSort]) row(slMemSort === 'count' ? '曲数' : '芸歴', DIRS[slMemSort], slMemDir, k => { slMemDir = k; redo(); });
 }
 function memHead(i) {
   const [, g, r, ki, , , bd] = MEMBERS[i];
@@ -2444,6 +2449,7 @@ function renderMemberList(q, year) {
   slMemMatch = new Map();
   slMemItems = MEMBERS.map((m, i) => [i, cnt(i)]).filter(([i, c]) => {
     if (year ? !((c > 0 && inGrp(MEMBERS[i][1])) || inTen(i)) : !inGrp(MEMBERS[i][1])) return false;
+    if (slMemStatus !== 'all' && memStatus(i) !== slMemStatus) return false;
     if (!q) return true;
     if (nameHit(i)) { slMemMatch.set(i, 'name'); return true; }
     if (prefHit(MEMBERS[i][7], q)) { slMemMatch.set(i, 'pref'); return true; }
@@ -2467,7 +2473,7 @@ function renderMemberList(q, year) {
     slMemItems.sort((a, b) => rank(a[0]) - rank(b[0]));
   }
   slMemLastHead = null;
-  document.getElementById('sl-total').textContent = `${slMemItems.length}人` + (year ? `（${year}年1月1日に在籍していた人・${year}年に歌った人）` : '');
+  document.getElementById('sl-total').textContent = `${slMemItems.length}人` + (slMemStatus === 'cur' ? '（現役）' : slMemStatus === 'grad' ? '（卒業生）' : '') + (year ? `（${year}年1月1日に在籍していた人・${year}年に歌った人）` : '');
   const box = document.getElementById('sl-list');
   box.innerHTML = slMemItems.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
   slMemShown = 0;
