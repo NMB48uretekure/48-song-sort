@@ -39,7 +39,7 @@
   }
   button {
     padding: 10px 18px; font-size: 14px; font-weight: bold; border: none; border-radius: 20px;
-    background: var(--main); color: #fff; cursor: pointer; font-family: inherit;
+    background: linear-gradient(135deg, #ee6194, #da3c74); color: #fff; cursor: pointer; font-family: inherit;
   }
   button:disabled { background: #ccc; }
   .btn-wide { display: block; width: 92%; max-width: 360px; margin: 14px auto 0; padding: 14px; font-size: 16px; border-radius: 999px; }
@@ -59,9 +59,8 @@
   .rk-row .ct { font-weight: bold; font-size: 16px; flex-shrink: 0; }
   .rk-row .ct small { font-size: 11px; color: #999; font-weight: normal; }
   .rk-bar { height: 4px; border-radius: 2px; margin-top: 4px; }
-  #rk-kind { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; border-radius: 18px; }
-  #rk-kind .tab { grid-column: span 2; border-radius: 15px; font-size: 13px; padding: 8px 2px; }
-  #rk-kind .tab.wide { grid-column: span 3; }
+  #rk-kind { gap: 2px; border-radius: 999px; }
+  #rk-kind .tab { flex: 0 0 auto; border-radius: 999px; font-size: 13px; padding: 8px 14px; white-space: nowrap; }
   .rk-order { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
   .rk-order .chip { font-size: 12px; }
   .rk-row .rk.none { color: #bbb; font-weight: normal; }
@@ -216,6 +215,97 @@
   .slide-seg > button { position: relative; z-index: 1; background: transparent !important; transition: color .25s; -webkit-tap-highlight-color: transparent; }
   .slide-seg > button:active { transform: none; }
   @media (prefers-reduced-motion: reduce) { .slide-seg > .seg-thumb { transition: none; } }
+  /* ---- 統一：ボタン・チップ・区切り ---- */
+  .slide-seg > .seg-thumb { background: linear-gradient(135deg, #ee6194, #da3c74); }
+  /* 聴いてみる（赤）・画像でシェア（黒）は、外のサービスへ行くボタンなので元の色のまま目立たせる */
+  .listen { box-shadow: 0 2px 8px rgba(230,33,23,.25); }
+  .shareb, .mem-share { box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .mem-act:not(.mem-share) { box-shadow: 0 4px 14px rgba(224,69,123,.25); }
+  .gchip, #grp-chips .chip { font-size: 13px; padding: 7px 14px; border-width: 1.5px; box-shadow: none; }
+  .chip { font-size: 12px; }
+  .chip.on:not(.gchip) { box-shadow: 0 2px 8px rgba(224,69,123,.22); }
+  .gchip.on { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .pick-sec, .pick-sec2 { border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 12px 6px; background: #fff; }
+  .pick-sec.need { border-color: var(--main); }
+  .pick-label { font-size: 14px; }
+  .pick-label .step { background: linear-gradient(135deg, #ee6194, #da3c74); box-shadow: 0 2px 6px rgba(224,69,123,.3); }
+  .pick-sec2 .pick-label .step { background: linear-gradient(135deg, #f3a6c1, #e07aa0); }
+  .top-choices { background: #fff; border: 1.5px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; margin: 2px 0 10px; }
+  .top-choice { border: 0 !important; border-radius: 999px; padding: 9px 4px; }
+  .top-choice b { font-size: 15px; }
+  .top-choice small { font-size: 9.5px; margin-top: 0; }
+  .top-choice.active small, .slide-seg > .top-choice.active small { color: #ffe3ee; }
+  .top-custom { border-radius: 999px !important; border-width: 1.5px !important; padding: 7px 12px !important; }
+  .top-custom .tc-l { font-size: 15px; }
+  .top-custom small { display: none; }
+  .btn-wide { box-shadow: 0 4px 14px rgba(224,69,123,.2); }
+  .btn-wide.btn-light, .btn-light { box-shadow: none; }
+  .btn-twitter { background: #111 !important; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  /* ---- 主役のボタン：光が走る＋やわらかい光の輪 ---- */
+  #start-btn:not(:disabled), .mem-act:not(.mem-share), .rp-btn { position: relative; overflow: hidden; }
+  #start-btn:not(:disabled) { padding: 12px 22px; font-size: 15px; box-shadow: 0 4px 16px rgba(224,69,123,.45); animation: ctaGlow 2.4s ease-in-out infinite; }
+  #start-btn:not(:disabled)::after, .mem-act:not(.mem-share)::after, .rp-btn::after {
+    content: ''; position: absolute; top: 0; left: -60%; width: 45%; height: 100%; pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent); transform: skewX(-20deg); animation: ctaShine 3.2s ease-in-out infinite; }
+  .rp-btn::after { background: linear-gradient(100deg, transparent, rgba(224,69,123,.18), transparent); }
+  @keyframes ctaShine { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+  @keyframes ctaGlow { 50% { box-shadow: 0 4px 22px rgba(224,69,123,.65), 0 0 0 4px rgba(224,69,123,.12); } }
+  /* 脇役のボタンは控えめに */
+  #clear-btn { background: #fff; color: #888; border: 1.5px solid #e6dce0; box-shadow: none; }
+  #clear-btn:disabled { background: #fff; color: #ccc; border-color: #eee; }
+  #start-btn:disabled { background: #e9e3e6; color: #b9aab1; }
+  .battle-foot .btn-small { background: #fff; color: #999; border: 1.5px solid #eee; }
+  #undo-btn:not(:disabled) { color: var(--main-dark); border-color: var(--line); }
+  /* 選択中の数：増えたり減ったりしたら弾む */
+  #sel-count { display: inline-block; transition: color .2s; }
+  #sel-count.bump { animation: bump .35s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes bump { 40% { transform: scale(1.45); } }
+  /* VS をバッジに */
+  .vs-text { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    background: linear-gradient(135deg, #ee6194, #da3c74); color: #fff !important; font-size: 13px !important; letter-spacing: .02em; box-shadow: 0 3px 10px rgba(224,69,123,.35); }
+  @media (min-width: 768px) { .vs-text { width: 48px; height: 48px; font-size: 15px !important; } }
+  /* 選んだ曲のチップ：ポンっと */
+  .song.on { animation: pick .28s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes pick { 50% { transform: scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { #start-btn, #start-btn::after, .mem-act::after, .rp-btn::after, .song.on, #sel-count.bump { animation: none !important; } }
+  /* ---- 見た目と動き ---- */
+  body { background: radial-gradient(120% 60% at 50% 0%, #ffe3ee 0%, #fff5f9 45%, #fff7fa 100%) fixed; }
+  h1 a#site-title { background: linear-gradient(90deg, #e0457b, #f07aa5 50%, #e0457b); -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 200% 100%; animation: titleShine 8s ease-in-out infinite; }
+  @keyframes titleShine { 50% { background-position: 100% 0; } }
+  .mainnav { background: rgba(255,255,255,.78) !important; -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px); }
+  .step-container { border-radius: 18px; box-shadow: 0 1px 2px rgba(224,69,123,.06), 0 8px 28px rgba(224,69,123,.08); animation: phaseIn .38s cubic-bezier(.2,.8,.2,1); }
+  @keyframes phaseIn { from { opacity: 0; transform: translateY(10px); } }
+  button { transition: transform .12s ease, filter .15s, background-color .2s, color .2s; }
+  button:not(:disabled):active { transform: scale(.96); }
+  .chip { transition: background-color .2s, color .2s, border-color .2s, transform .12s; }
+  .battle-card.enter { animation: cardIn .34s cubic-bezier(.2,.9,.3,1.2); }
+  .battle-card.enter + .vs-text + .battle-card.enter { animation-delay: .04s; }
+  @keyframes cardIn { from { opacity: .2; transform: scale(.94) translateY(6px); } }
+  .prog i { transition: width .45s cubic-bezier(.2,.8,.2,1); }
+  #sl-list > *, #rk-list > * { animation: rowIn .32s ease both; }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(6px); } }
+  #song-modal .mcard { box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .sticky-bar { background: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px); }
+  .btn-row { display: flex; gap: 10px; width: 92%; max-width: 420px; margin: 14px auto 0; }
+  .btn-row button { flex: 1; padding: 14px 6px; font-size: 15px; border-radius: 999px; }
+  .rk-order.mp-seg { width: 220px; margin: 0 auto 10px; }
+  .tabs.rk-kind { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; display: flex !important; grid-template-columns: none !important; }
+  .tabs.rk-kind::-webkit-scrollbar { display: none; }
+  .tabs.rk-kind .tab { flex: 0 0 auto; padding: 9px 14px; white-space: nowrap; }
+  /* 絞り込み（折りたたみ） */
+  .ftog { display: flex; align-items: center; gap: 8px; width: 100%; margin: 2px 0 8px; padding: 11px 14px; border-radius: 14px; background: #fff; color: var(--main-dark); border: 1.5px solid var(--line); font-size: 13px; text-align: left; }
+  .ftog-ic { font-size: 14px; opacity: .7; }
+  .ftog-l { font-weight: bold; white-space: nowrap; }
+  .ftog-sum { flex: 1; min-width: 0; font-weight: normal; color: #a07a8a; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .ftog-ar { font-size: 18px; line-height: 1; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+  .ftog.open .ftog-ar { transform: rotate(90deg); }
+  .ftog.open { border-color: var(--main); }
+  .fpanel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .38s cubic-bezier(.2,.8,.2,1), opacity .3s; opacity: 0; }
+  .fpanel.open { grid-template-rows: 1fr; opacity: 1; }
+  .fpanel-in { overflow: hidden; min-height: 0; }
+  .fpanel.open .fpanel-in { padding: 2px 0 8px; }
+  .fp-h { margin: 6px 0 6px; font-size: 11px; font-weight: bold; color: #b07890; text-align: center; letter-spacing: .1em; }
+  #sl-order.mpanel { margin-top: 4px; }
   .mpanel { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 10px; margin: 12px 0 14px; padding: 10px 12px; background: #fff7fa; border: 1.5px solid var(--line); border-radius: 14px; }
   .mp-l { font-size: 11px; font-weight: bold; color: #b07890; white-space: nowrap; }
   .mp-seg { display: flex; background: #fff; border: 1.5px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; min-width: 0; }
@@ -369,7 +459,7 @@
   <button data-nav="rank" id="nav-rank" onclick="navTo('rank')">ランキング</button>
   <button data-nav="list" onclick="navTo('list')">楽曲一覧</button>
 </nav>
-<p class="desc">AKB48・SKE48・NMB48・HKT48・NGT48・STU48・SDN48 の表題曲・カップリング・アルバム曲・劇場公演曲・ユニット曲・ソロ曲から</p>
+<p class="desc" id="hdr-desc">AKB48・SKE48・NMB48・HKT48・NGT48・STU48・SDN48 の表題曲・カップリング・アルバム曲・劇場公演曲・ユニット曲・ソロ曲から</p>
 
 <!-- 予選 -->
 <div id="resume-box" class="step-container resume-box hidden">
@@ -443,8 +533,10 @@
   <div id="result-more"></div>
   <p class="help" id="result-pages"></p>
   <p class="help" id="save-hint">画像を長押ししても保存できます</p>
-  <button class="btn-wide btn-twitter" onclick="shareToX()">𝕏 に画像つきで投稿する</button>
-  <button class="btn-wide" onclick="saveImage()">画像を保存する</button>
+  <div class="btn-row">
+    <button class="btn-twitter" onclick="shareToX()">𝕏 で投稿</button>
+    <button onclick="saveImage()">画像を保存</button>
+  </div>
   <div id="first-notice" class="first-notice hidden"></div>
   <div class="rank-promo" id="rank-promo">
     <p class="rp-title">みんなの人気曲ランキング</p>
@@ -460,7 +552,7 @@
   <p class="desc" id="rk-total">読み込み中…</p>
   <div class="chips" id="rk-grp"></div>
   <input class="search" id="rk-search" type="search" placeholder="曲名で検索" oninput="renderRanking()">
-  <div class="tabs" id="rk-kind">
+  <div class="tabs rk-kind" id="rk-kind">
     <button class="tab active" data-rk="point" onclick="setRankKind('point')">ポイント</button>
     <button class="tab" data-rk="first" onclick="setRankKind('first')">1位の回数</button>
     <button class="tab" data-rk="in" onclick="setRankKind('in')">TOP16入り</button>
@@ -468,14 +560,16 @@
     <button class="tab" data-rk="low" onclick="setRankKind('low')">10回以下の曲</button>
     <button class="tab" data-rk="zero" onclick="setRankKind('zero')">0回の曲</button>
   </div>
-  <div class="rk-order" id="rk-order">
-    <button class="chip on" data-ord="desc" onclick="setRankOrder('desc')">降順（多い順）</button>
-    <button class="chip" data-ord="asc" onclick="setRankOrder('asc')">昇順（少ない順）</button>
+  <div class="rk-order mp-seg" id="rk-order">
+    <button class="mp-b on" data-ord="desc" onclick="setRankOrder('desc')">多い順</button>
+    <button class="mp-b" data-ord="asc" onclick="setRankOrder('asc')">少ない順</button>
   </div>
   <p class="help" id="rk-help"></p>
   <div id="rk-list"></div>
-  <button class="btn-wide btn-light" onclick="loadRanking()">最新にする</button>
-  <button class="btn-wide" onclick="closeRanking()">ソートに戻る</button>
+  <div class="btn-row">
+    <button class="btn-light" onclick="loadRanking()">↻ 最新にする</button>
+    <button onclick="closeRanking()">ソートに戻る</button>
+  </div>
 </div>
 
 <!-- 楽曲一覧 -->
@@ -486,18 +580,25 @@
     <button class="tab active" data-sl="song" onclick="setSlMode('song')">曲で見る</button>
     <button class="tab" data-sl="mem" onclick="setSlMode('mem')">メンバーで見る</button>
   </div>
-  <div class="chips" id="sl-grp"></div>
-  <div class="chips" id="sl-cat"></div>
-  <div class="chips" id="sl-msort"></div>
-  <div class="chips hidden" id="sl-mdir" style="margin-top:-4px"></div>
-  <div class="chips" id="sl-order"></div>
   <div class="sl-tools">
     <input class="search" id="sl-search" type="search" placeholder="曲名・メンバー名で検索" oninput="renderSongList()">
     <select id="sl-year" onchange="renderSongList()" aria-label="年でしぼる"></select>
   </div>
-  <p class="help" id="sl-help" style="margin:0 0 6px"></p>
-  <p class="help" style="margin:0 0 8px">※歌唱メンバーや発売日などは個人で調べたもので、正しいとは限りません</p>
+  <button type="button" class="ftog" id="sl-ftog" onclick="toggleSlFilter()" aria-expanded="false">
+    <span class="ftog-ic">⚙︎</span><span class="ftog-l">絞り込み・並び順</span><span class="ftog-sum" id="sl-fsum"></span><span class="ftog-ar">›</span>
+  </button>
+  <div class="fpanel" id="sl-fpanel"><div class="fpanel-in">
+    <p class="fp-h">グループ</p>
+    <div class="chips" id="sl-grp"></div>
+    <p class="fp-h" id="sl-cat-h">種類</p>
+    <div class="chips" id="sl-cat"></div>
+    <div class="chips" id="sl-msort"></div>
+    <div class="chips hidden" id="sl-mdir"></div>
+    <div id="sl-order"></div>
+  </div></div>
+  <p class="help" id="sl-help" style="margin:4px 0 6px"></p>
   <div id="sl-list"></div>
+  <p class="help" style="margin:10px 0 0">※歌唱メンバーや発売日などは個人で調べたもので、正しいとは限りません</p>
   <button class="btn-wide" onclick="closeSongList()">ソートに戻る</button>
 </div>
 
@@ -1827,7 +1928,8 @@ function clearAll() { selected.clear(); refreshMarks(); }
 function updateBar() {
   saveSelection();
   const n = selected.size;
-  document.getElementById('sel-count').textContent = n;
+  const sc = document.getElementById('sel-count');
+  if (sc.textContent !== String(n)) { sc.textContent = n; sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
   document.getElementById('clear-btn').disabled = n === 0;
   document.getElementById('start-btn').disabled = n < needN();
   document.getElementById('sel-hint').textContent = TOP_N === TOP_ALL
@@ -1869,6 +1971,7 @@ function showPhase(n) {
   nav.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === cur));
   if (n === 1) refreshResume(); else document.getElementById('resume-box').classList.add('hidden');
   document.getElementById('sticky-bar').classList.toggle('hidden', n !== 1);
+  document.getElementById('hdr-desc').classList.toggle('hidden', n !== 1);
   requestAnimationFrame(() => document.querySelectorAll('.slide-seg').forEach(x => x._seg && x._seg(false)));
 }
 
@@ -1940,6 +2043,7 @@ function renderBattle(a, b) {
   document.getElementById('f0-s').textContent = dispSrc(a.s);
   document.getElementById('f1-t').textContent = dispName(b.t);
   document.getElementById('f1-s').textContent = dispSrc(b.s);
+  document.querySelectorAll('.battle-card').forEach(c => { c.classList.remove('enter'); void c.offsetWidth; c.classList.add('enter'); });
   const left = remainingMax();
   document.getElementById('progress-desc').innerHTML = `第${battleCount + 1}戦　<span class="left">あと最大 <b>${left}</b> 戦</span>`;
   const done = battleCount / (battleCount + left);
@@ -2272,16 +2376,46 @@ function buildSongListChips() {
   mk(document.getElementById('sl-grp'), GROUPS, slGrps, 'すべて', true);
   const cat = document.getElementById('sl-cat');
   if (slMode === 'song') mk(cat, CATS, slCats, 'すべての種類', false); else cat.innerHTML = '';
+  document.getElementById('sl-cat-h').classList.toggle('hidden', slMode !== 'song');
   const ord = document.getElementById('sl-order');
-  ord.innerHTML = '';
-  if (slMode === 'song') [['date', '発売順'], ['group', 'グループ順']].forEach(([k, label]) => {
-    const b = document.createElement('button');
-    b.className = 'chip' + (slOrder === k ? ' on' : '');
-    b.textContent = label;
-    b.onclick = () => { slOrder = k; buildSongListChips(); renderSongList(); };
-    ord.appendChild(b);
-  });
+  if (slMode === 'song') {
+    if (!ord._built) {
+      ord.innerHTML = ''; ord.className = 'mpanel'; ord._built = true;
+      const l = document.createElement('div'); l.className = 'mp-l'; l.textContent = '並び順';
+      const seg = document.createElement('div'); seg.className = 'mp-seg';
+      [['date', '発売順'], ['group', 'グループ順']].forEach(([k, label]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'mp-b'; b.dataset.o = k; b.textContent = label;
+        b.onclick = () => { slOrder = k; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.o === slOrder)); updateSlSummary(); setTimeout(() => renderSongList(), 0); };
+        seg.appendChild(b);
+      });
+      ord.append(l, seg); attachSeg(seg);
+    }
+    ord.classList.remove('hidden');
+    ord.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.o === slOrder));
+  } else ord.classList.add('hidden');
   buildMemSortChips();
+  updateSlSummary();
+}
+// 絞り込みの開け閉め（ヌルっと開く）
+function toggleSlFilter(open) {
+  const p = document.getElementById('sl-fpanel'), t = document.getElementById('sl-ftog');
+  const on = open == null ? !p.classList.contains('open') : open;
+  p.classList.toggle('open', on); t.classList.toggle('open', on); t.setAttribute('aria-expanded', on);
+  if (on) requestAnimationFrame(() => p.querySelectorAll('.slide-seg').forEach(x => x._seg && x._seg(false)));
+}
+// 今の絞り込みを1行で（閉じていても分かるように）
+function updateSlSummary() {
+  const el = document.getElementById('sl-fsum'); if (!el) return;
+  const parts = [slGrps.size ? [...slGrps].join('・') : '全グループ'];
+  if (slMode === 'song') {
+    if (slCats.size) parts.push([...slCats].join('・'));
+    parts.push(slOrder === 'date' ? '発売順' : 'グループ順');
+  } else {
+    if (slMemStatus !== 'all') parts.push(slMemStatus === 'cur' ? '現役' : '卒業生');
+    const so = (MSORTS.find(x => x[0] === slMemSort) || [, ''])[1];
+    parts.push(so + (slMemSort === 'count' ? (slMemDir === 'asc' ? '（少ない）' : '') : slMemSort === 'career' ? (slMemDir === 'asc' ? '（短い）' : '（長い）') : ''));
+  }
+  el.textContent = parts.join('／');
 }
 const SONG_IDX = new Map(SONGS.map((s, i) => [s, i]));
 const dateKey = s => { const d = relDate(s); return !d ? '9999' : d.length === 4 ? d + '-99' : d; };
@@ -2440,7 +2574,7 @@ function buildMemSortChips() {
         if (grp === 'st') slMemStatus = k;
         else if (grp === 'so') { if (slMemSort !== k) slMemDir = 'desc'; slMemSort = k; }
         else slMemDir = k;
-        sync();
+        sync(); updateSlSummary();
         setTimeout(() => renderSongList(), 0);   // つまみが動き出してから一覧を作り直す
       };
       seg.appendChild(b);
@@ -2979,7 +3113,8 @@ function goHomeFromSort() {
     (s.sel || []).forEach(i => { if (SONG_BY_ID[i]) selected.add(i); });
   }
 })();
-['mainnav', 'sl-mode', 'rk-kind'].forEach(id => attachSeg(document.getElementById(id)));
+['mainnav', 'sl-mode', 'rk-kind', 'rk-order'].forEach(id => attachSeg(document.getElementById(id)));
+attachSeg(document.querySelector('.top-choices'));
 buildGroupChips();
 buildChips();
 buildTopSelect();
