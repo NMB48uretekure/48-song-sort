@@ -1350,6 +1350,7 @@ function memTenureLines(i) {
     return `${g}：${from || '?'}〜${fmtDate(l)}`;
   });
   if (ten.length && ten.every(t => t[2])) { const last = ten.map(t => t[2]).sort().pop(); out.push(`${fmtDate(last)}に卒業`); }
+  if (careerYMD(i)) out.push(`芸歴：${careerText(i)}`);
   return out;
 }
 const memGraduated = i => { const ten = MEM_TEN[i] || []; return (ten.length > 0 && ten.every(t => t[2])) || MEMBERS[i][1] === 'SDN48'; };
@@ -2534,7 +2535,9 @@ function slAddMore(box, rest, fn) {
 let slMemItems = [], slMemShown = 0, slMemSort = 'count', slMemDir = 'desc', slMemStatus = 'all', slMemLastHead = null, slMemMatch = new Map(), slMemSplit = '';
 const MSORTS = [['count', '曲数順'], ['ki', '期生順'], ['kana', '五十音順'], ['age', '年齢順'], ['pref', '出身地順'], ['career', '芸歴順']];
 // 芸歴：48グループに在籍していた日数の合計（兼任などで重なる期間は1回だけ数える）。在籍中の人は今日まで
-const TODAY = new Date().toISOString().slice(0, 10);
+// 今日の日付（日本時間などその人の端末の日付。日付が変わると芸歴も1日増える）
+const localDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+let TODAY = localDate();
 const careerDays = i => {
   const iv = (MEM_TEN[i] || []).filter(t => t[1]).map(t => [Date.parse(t[1]), Date.parse(t[2] || TODAY)]).filter(x => x[1] >= x[0]).sort((a, b) => a[0] - b[0]);
   if (!iv.length) return -1;
@@ -2542,7 +2545,31 @@ const careerDays = i => {
   for (const [a, b] of iv.slice(1)) { if (a <= ce) ce = Math.max(ce, b); else { tot += ce - cs; [cs, ce] = [a, b]; } }
   return Math.round((tot + ce - cs) / 864e5);
 };
-const careerText = d => { if (d < 0) return '在籍期間不明'; const y = Math.floor(d / 365.25), m = Math.floor((d - y * 365.25) / 30.44); return y ? `${y}年${m ? m + 'か月' : ''}` : m ? `${m}か月` : '1か月未満'; };
+// 在籍期間（重なりをまとめた区間ごと）を「○年○か月○日」に。区間が複数ある人は足し合わせる
+const careerSpans = i => {
+  const iv = (MEM_TEN[i] || []).filter(t => t[1]).map(t => [t[1], t[2] || TODAY]).filter(x => x[1] >= x[0]).sort((a, b) => a[0] < b[0] ? -1 : 1);
+  const out = [];
+  for (const [a, b] of iv) { const l = out[out.length - 1]; if (l && a <= l[1]) { if (b > l[1]) l[1] = b; } else out.push([a, b]); }
+  return out;
+};
+const ymdDiff = (a, b) => {
+  const [y1, m1, d1] = a.split('-').map(Number), [y2, m2, d2] = b.split('-').map(Number);
+  let y = y2 - y1, m = m2 - m1, d = d2 - d1;
+  if (d < 0) { m--; d += new Date(y2, m2 - 1, 0).getDate(); }   // 前の月の日数を足す
+  if (m < 0) { y--; m += 12; }
+  return [y, m, d];
+};
+const careerYMD = i => {
+  const sp = careerSpans(i); if (!sp.length) return null;
+  let y = 0, m = 0, d = 0;
+  sp.forEach(([a, b]) => { const r = ymdDiff(a, b); y += r[0]; m += r[1]; d += r[2]; });
+  if (d >= 30) { m += Math.floor(d / 30); d %= 30; }
+  if (m >= 12) { y += Math.floor(m / 12); m %= 12; }
+  return [y, m, d];
+};
+const careerText = i => { const r = careerYMD(i); if (!r) return '在籍期間不明'; const [y, m, d] = r; return (y ? y + '年' : '') + (m ? m + 'か月' : '') + (d || (!y && !m) ? d + '日' : ''); };
+// 日付が変わったら（ページを開いたまま日をまたいだ時も）芸歴を更新
+setInterval(() => { const t = localDate(); if (t !== TODAY) { TODAY = t; try { if (typeof slMemSort !== 'undefined' && slMemSort === 'career' && typeof renderSongList === 'function') renderSongList(true); } catch (e) {} } }, 60000);
 // 出身地の並び（北から南、そのあと海外）
 const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
 const PREF_READ = Object.fromEntries('ほっかいどう,あおもりけん,いわてけん,みやぎけん,あきたけん,やまがたけん,ふくしまけん,いばらきけん,とちぎけん,ぐんまけん,さいたまけん,ちばけん,とうきょうと,かながわけん,にいがたけん,とやまけん,いしかわけん,ふくいけん,やまなしけん,ながのけん,ぎふけん,しずおかけん,あいちけん,みえけん,しがけん,きょうとふ,おおさかふ,ひょうごけん,ならけん,わかやまけん,とっとりけん,しまねけん,おかやまけん,ひろしまけん,やまぐちけん,とくしまけん,かがわけん,えひめけん,こうちけん,ふくおかけん,さがけん,ながさきけん,くまもとけん,おおいたけん,みやざきけん,かごしまけん,おきなわけん'.split(',').map((r, k) => [PREFS[k], r]));
@@ -2681,7 +2708,7 @@ function slMemMore() {
     b.onclick = e => openMemberModal(i, false, e);
     const sm = document.createElement('small'); sm.style.cssText = 'display:block;color:#999;font-size:11px';
     const bdt = MEMBERS[i][6] ? fmtDate(MEMBERS[i][6]) + '生まれ' : '';
-    sm.textContent = [MEMBERS[i][1], MEMBERS[i][3] && MEMBERS[i][3] !== 'その他' ? MEMBERS[i][3] : '', slMemSort === 'age' ? bdt : slMemSort === 'career' ? (careerDays(i) < 0 ? '在籍期間不明' : '在籍' + careerText(careerDays(i))) : MEMBERS[i][2], memGraduated(i) ? '卒業' : ''].filter(Boolean).join('・');
+    sm.textContent = [MEMBERS[i][1], MEMBERS[i][3] && MEMBERS[i][3] !== 'その他' ? MEMBERS[i][3] : '', slMemSort === 'age' ? bdt : slMemSort === 'career' ? (careerDays(i) < 0 ? '在籍期間不明' : '在籍' + careerText(i)) : MEMBERS[i][2], memGraduated(i) ? '卒業' : ''].filter(Boolean).join('・');
     nm.append(b, sm);
     const ct = document.createElement('div'); ct.className = 'ct'; ct.innerHTML = `${c}<small>曲</small>`;
     row.append(nm, ct);
