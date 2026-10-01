@@ -426,8 +426,7 @@
   <p class="help" id="result-pages"></p>
   <p class="help" id="save-hint">画像を長押ししても保存できます</p>
   <button class="btn-wide btn-twitter" onclick="shareToX()">𝕏 に画像つきで投稿する</button>
-  <button class="btn-wide" onclick="shareResultSheet()">LINEなどで送る（画像＋リンク）</button>
-  <button class="btn-wide btn-light" onclick="saveImage()">画像を保存する</button>
+  <button class="btn-wide" onclick="saveImage()">画像を保存する</button>
   <div id="first-notice" class="first-notice hidden"></div>
   <div class="rank-promo" id="rank-promo">
     <p class="rp-title">みんなの人気曲ランキング</p>
@@ -2559,8 +2558,10 @@ async function shareSong(s) {
 async function shareImage(blob, name, text) {
   track('share', { file_name: name });
   let file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
-  const m = text.match(/https?:\/\/\S+/);
-  openShareSheet({ files: file ? [file] : [], blobs: [blob], names: [name], text, url: m ? m[0] : '' });
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  await saveBlobs([blob], [name]);
 }
 /* 共有のしかたを選ぶ画面（LINEなどで「画像＋リンク」を送れるように）。ボタンを押した瞬間に共有するので、スマホでも確実に開く */
 function openShareSheet(o) {
