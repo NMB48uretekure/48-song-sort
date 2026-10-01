@@ -207,6 +207,21 @@
   .mems .chips { justify-content: flex-start; margin: 0; gap: 5px; }
   .mchip { padding: 4px 9px; font-size: 12px; border-radius: 999px; background: #fff; color: #333; border: 1.5px solid var(--line); font-weight: bold; }
   .mchip:active { opacity: .6; }
+  .who-ov { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: whoIn .25s ease; }
+  .who-card { background: #fff; border-radius: 22px; padding: 28px 22px 22px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.25); animation: whoPop .45s cubic-bezier(.2,1.6,.4,1); }
+  .who-emoji { font-size: 56px; line-height: 1; }
+  .who-big { font-size: 24px; font-weight: 900; color: var(--main); margin: 14px 0 8px; }
+  .who-sub { font-size: 14px; color: #666; margin: 0 0 18px; line-height: 1.7; }
+  .who-card button { border: 0; border-radius: 999px; padding: 12px 28px; background: var(--main); color: #fff; font-weight: bold; font-size: 15px; }
+  @keyframes whoIn { from { opacity: 0; } }
+  @keyframes whoPop { from { transform: scale(.6); opacity: 0; } }
+  #result-more img { width: 100%; display: block; border-radius: 14px; box-shadow: 0 3px 14px rgba(0,0,0,.12); margin: 10px 0 0; }
+  .all-ranks { max-height: 420px; overflow: auto; border: 1.5px solid var(--line); border-radius: 12px; padding: 4px 10px; background: #fff; text-align: left; }
+  .all-ranks div { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid #f6e3ea; font-size: 13px; }
+  .all-ranks div:last-child { border-bottom: 0; }
+  .all-ranks b { min-width: 3.2em; text-align: right; color: var(--main); }
+  .all-ranks span { flex: 1; }
+  .all-ranks small { color: #999; font-size: 11px; }
   .mems .mchip { font-weight: normal; }
   .mems .mchip.center { font-weight: 900; border-width: 2.5px; }
   .mems .cen-note { font-size: 11px; color: var(--sub, #999); font-weight: normal; margin-left: 6px; }
@@ -367,6 +382,8 @@
     <img id="result-img" alt="あなたの48グループ好きな曲ランキング">
     <div id="result-loading" class="result-loading">画像を作成中…</div>
   </div>
+  <div id="result-more"></div>
+  <p class="help" id="result-pages"></p>
   <p class="help">画像を長押ししても保存できます</p>
   <button class="btn-wide btn-twitter" onclick="shareToX()">𝕏 に画像つきで投稿する</button>
   <button class="btn-wide" onclick="saveImage()">画像を保存する</button>
@@ -1157,7 +1174,7 @@ function sortMemberSongs(i) {
   catOn = new Set(CATS);
   document.getElementById('search').value = '';
   buildGroupChips(); buildChips(); renderList();
-  if (songs.length < TOP_N) setTop([7, 10, 16].filter(n => n <= songs.length).pop() || 7);
+  if (songs.length < TOP_N && TOP_N !== TOP_ALL) setTop([7, 10, 16].filter(n => n <= songs.length).pop() || 7);
   closeModalNow();
   showPhase(1);
   const ls = document.querySelector('.list-label'); if (ls) ls.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
@@ -1533,7 +1550,7 @@ let TOP_N = 10;
 let catOn = new Set(CATS);
 let selected = new Set();
 let sortQueues = [], parentQueue = [], undoStack = [], battleCount = 0, ties = [];
-let finalList = [], finalRanks = [], resultBlob = null;
+let finalList = [], finalRanks = [], resultBlob = null, resultBlobs = [];
 
 /* ---------- ジャケ写 ---------- */
 function jacketCands(key) {
@@ -1586,11 +1603,14 @@ function loadJacket(key) {
 }
 
 /* ---------- 予選 ---------- */
-const validTop = n => Number.isInteger(n) && n >= 7 && n <= 100;
+const TOP_ALL = 9999;   // 「全部」：選んだ曲すべての順位を決める
+const validTop = n => Number.isInteger(n) && ((n >= 7 && n <= 100) || n === TOP_ALL);
+const needN = () => TOP_N === TOP_ALL ? 2 : TOP_N;
 function buildTopSelect() {
   const sel = document.getElementById('top-select');
   sel.innerHTML = '<option value="" disabled>数を選ぶ</option>';
   for (let n = 17; n <= 100; n++) sel.add(new Option(n + '位', n));
+  sel.add(new Option('全部（選んだ曲すべて）', TOP_ALL));
 }
 // 17〜100位は、ボタンの枠のどこを押しても選択肢（ピッカー）が開くようにする
 function openTopPicker(e) {
@@ -1715,9 +1735,10 @@ function updateBar() {
   const n = selected.size;
   document.getElementById('sel-count').textContent = n;
   document.getElementById('clear-btn').disabled = n === 0;
-  document.getElementById('start-btn').disabled = n < TOP_N;
-  document.getElementById('sel-hint').textContent =
-    n < TOP_N ? `TOP${TOP_N}なので、あと${TOP_N - n}曲選んでください` : `バトルはだいたい${estimate(n)}回くらいです`;
+  document.getElementById('start-btn').disabled = n < needN();
+  document.getElementById('sel-hint').textContent = TOP_N === TOP_ALL
+    ? (n < 2 ? '全部の順位を決めるので、2曲以上選んでください' : `全${n}曲の順位を決めます。バトルはだいたい${estimate(n)}回くらいです`)
+    : n < TOP_N ? `TOP${TOP_N}なので、あと${TOP_N - n}曲選んでください` : `バトルはだいたい${estimate(n)}回くらいです`;
 }
 // 上位TOP_Nだけ決めるマージソートのおおよその対戦回数
 function estimate(n) {
@@ -1757,7 +1778,7 @@ function showPhase(n) {
 }
 
 function startSort() {
-  if (selected.size < TOP_N) return;
+  if (selected.size < needN()) return;
   const list = shuffle(SONGS.filter(s => selected.has(s.id)));
   sortQueues = list.map(s => [s]);
   parentQueue = []; undoStack = []; battleCount = 0; ties = [];
@@ -1920,18 +1941,30 @@ function showRanking() {
   updateRankPromo().finally(() => sendResult(finalList));
   showPhase(3);
   window.scrollTo(0, 0);
-  document.getElementById('result-title').textContent = `あなたの好きな曲TOP${finalList.length}ができました！`;
-  resultBlob = null;
+  document.getElementById('result-title').textContent = TOP_N === TOP_ALL ? `あなたの好きな曲 全${finalList.length}曲の順位ができました！` : `あなたの好きな曲TOP${finalList.length}ができました！`;
+  resultBlob = null; resultBlobs = [];
+  // 全曲（全グループの全部の曲）の順位を最後まで決めた人だけに出すメッセージ
+  if (TOP_N === TOP_ALL && finalList.length >= SONGS.length) setTimeout(showWhoAreYou, 800);
   const img = document.getElementById('result-img');
   img.removeAttribute('src');
+  const more = document.getElementById('result-more'); more.innerHTML = '';
+  const pages = resultPages(finalList.length);
+  document.getElementById('result-pages').textContent = pages > 1 ? `${PAGE_N}曲ずつ、${pages}枚の画像に分けています` : '';
   const loading = document.getElementById('result-loading');
   loading.textContent = '画像を作成中…';
   loading.classList.remove('hidden');
-  drawResultImage(finalList).then(c => {
-    img.src = c.toDataURL('image/png');
-    c.toBlob(b => { resultBlob = b; }, 'image/png');
-    loading.classList.add('hidden');
-  }).catch(() => {
+  const myList = finalList;
+  (async () => {
+    for (let pg = 0; pg < pages; pg++) {
+      if (finalList !== myList) return;   // 途中でやり直したら止める
+      const c = await drawResultImage(myList, pg);
+      const el = pg === 0 ? img : Object.assign(document.createElement('img'), { alt: `${pg * PAGE_N + 1}位から` });
+      el.src = c.toDataURL('image/png');
+      if (pg > 0) more.appendChild(el);
+      const b = await new Promise(r => c.toBlob(r, 'image/png'));
+      resultBlobs[pg] = b; if (pg === 0) { resultBlob = b; loading.classList.add('hidden'); }
+    }
+  })().catch(() => {
     loading.textContent = '画像を作成できませんでした。スクリーンショットで保存してください';
   });
 }
@@ -2006,17 +2039,23 @@ function drawCard(ctx, s, rank, im, x, y, w, h, p) {
 }
 const TOP_CARD = { top: true, r: 22, lw: 6, pad: 22, bs: 110, gap: 20, gap2: 24, padR: 26, ts: 54, ss: 26, ty: 6, sy: 50 };
 
-async function drawResultImage(list) {
+const PAGE_N = 30;   // 30曲より多いときは、画像を30曲ずつに分ける
+const resultPages = n => n > PAGE_N ? Math.ceil(n / PAGE_N) : 1;
+async function drawResultImage(full, page = 0) {
+  const total = full.length, pages = resultPages(total);
+  const off = page * PAGE_N;
+  const list = pages > 1 ? full.slice(off, off + PAGE_N) : full;
+  const hasTop = page === 0;   // 1位の大きいカードは1枚目だけ
   const jackets = await Promise.all(list.map(s => loadJacket(s.j)));
-  const wide = list.length > 16;   // 17曲以上は2列にして、100曲でも縦に長くなりすぎないようにする
-  const W = 1080, topH = wide ? 170 : 190, headH = 236;
+  const wide = list.length > 16 || !hasTop;   // 17曲以上は2列
+  const W = 1080, topH = !hasTop ? 0 : wide ? 170 : 190, headH = pages > 1 ? 262 : 236;
   const rowH = wide ? (list.length <= 40 ? 84 : 66) : (list.length > 10 ? 86 : 100), gapY = wide ? 8 : 12;
-  const rest = list.length - 1, rows = wide ? Math.ceil(rest / 2) : rest;
-  const H = headH + topH + 16 + rows * (rowH + gapY) - gapY + 70;
+  const rest = list.length - (hasTop ? 1 : 0), rows = wide ? Math.ceil(rest / 2) : rest;
+  const H = headH + (hasTop ? topH + 16 : 0) + rows * (rowH + gapY) - gapY + 70;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  RESULT_THEME = themeFor(list);
+  RESULT_THEME = themeFor(full);
   ctx.fillStyle = RESULT_THEME.bg; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#fff'; roundRect(ctx, 30, 30, W - 60, H - 60, 36); ctx.fill();
 
@@ -2024,9 +2063,13 @@ async function drawResultImage(list) {
   ctx.fillStyle = '#333'; ctx.font = `bold 48px ${FONT}`;
   ctx.fillText('あなたの', W / 2, 116);
   ctx.fillStyle = RESULT_THEME.main; ctx.font = `bold 64px ${FONT}`;
-  ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲 TOP${list.length}`, W / 2, 194);
+  if (pages > 1) {
+    ctx.font = `bold 56px ${FONT}`;
+    ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲 TOP${total}`, W / 2, 186);
+    ctx.fillStyle = '#999'; ctx.font = `bold 30px ${FONT}`; ctx.fillText(`${off + 1}〜${off + list.length}位（${page + 1}/${pages}）`, W / 2, 228);
+  } else ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲 TOP${total}`, W / 2, 194);
 
-  const rankOf = i => finalRanks[i] || i + 1;
+  const rankOf = i => finalRanks[off + i] || off + i + 1;
   if (!wide) {
     const x = 70, w = W - 140;
     const rowP = { top: false, r: 22, lw: 3, shadow: 12, pad: 22, bs: rowH - 30, js: rowH - 22, gap: 20, gap2: 24, padR: 26,
@@ -2041,12 +2084,12 @@ async function drawResultImage(list) {
   }
   // 1位は大きく、2位から下は2列（左の列を上から下 → 右の列）
   const x = 60, w = W - 120;
-  drawCard(ctx, list[0], rankOf(0), jackets[0], x, headH, w, topH, Object.assign({ js: topH - 36 }, TOP_CARD));
-  const big = rowH > 70, colGap = 14, cw = (w - colGap) / 2, y0 = headH + topH + 16;
+  if (hasTop) drawCard(ctx, list[0], rankOf(0), jackets[0], x, headH, w, topH, Object.assign({ js: topH - 36 }, TOP_CARD));
+  const big = rowH > 70, colGap = 14, cw = (w - colGap) / 2, y0 = headH + (hasTop ? topH + 16 : 0);
   const rowP = { top: false, r: 14, lw: 2, shadow: 6, pad: 10, bs: rowH - (big ? 30 : 24), js: rowH - 14, gap: 10, gap2: 12, padR: 12,
     ts: big ? 28 : 23, ss: big ? 16 : 14, ty: big ? -2 : -3, sy: big ? 24 : 19 };
-  for (let i = 1; i < list.length; i++) {
-    const k = i - 1, col = k < rows ? 0 : 1, r = col ? k - rows : k;
+  for (let i = hasTop ? 1 : 0; i < list.length; i++) {
+    const k = i - (hasTop ? 1 : 0), col = k < rows ? 0 : 1, r = col ? k - rows : k;
     drawCard(ctx, list[i], rankOf(i), jackets[i], x + col * (cw + colGap), y0 + r * (rowH + gapY), cw, rowH, rowP);
   }
   return c;
@@ -2338,14 +2381,15 @@ function shareText() {
   const u = pageUrl();
   return `${resultTag()}` + (u ? `\n${u}` : '') + `\n\n私の${themeFor(finalList).group || '48グループ'} 好きな曲TOP${finalList.length}\n\n${lines.join('\n')}`;
 }
-function resultFile() {
-  if (!resultBlob) return null;
-  try { return new File([resultBlob], '48group_songs.png', { type: 'image/png' }); } catch (e) { return null; }
+function resultFiles(max) {
+  const bs = (resultBlobs.length ? resultBlobs : [resultBlob]).filter(Boolean).slice(0, max || 999);
+  try { return bs.map((b, i) => new File([b], bs.length > 1 ? `48group_songs_${i + 1}.png` : '48group_songs.png', { type: 'image/png' })); } catch (e) { return []; }
 }
+// Xに投稿するときは画像4枚まで（Xの上限）、保存するときは全部
 async function shareWithSheet(withText) {
-  const f = resultFile();
-  if (!f || !navigator.canShare || !navigator.canShare({ files: [f] })) return false;
-  try { await navigator.share(withText ? { files: [f], text: shareText() } : { files: [f] }); return true; }
+  const fs = resultFiles(withText ? 4 : 0);
+  if (!fs.length || !navigator.canShare || !navigator.canShare({ files: fs })) return false;
+  try { await navigator.share(withText ? { files: fs, text: shareText() } : { files: fs }); return true; }
   catch (e) { return e && e.name === 'AbortError'; }
 }
 async function saveImage() {
@@ -2353,16 +2397,18 @@ async function saveImage() {
   try {
     const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
     if (dl) {
-      try { await dl.save({ filename: '48group_songs.png', data: resultBlob }); showToast('画像を保存しました'); }
+      try { const fs = resultFiles(); for (const f of fs) await dl.save({ filename: f.name, data: f }); showToast(fs.length > 1 ? `画像を${fs.length}枚保存しました` : '画像を保存しました'); }
       catch (e) { if (!e || e.code !== 'declined') showToast('保存できないときは、画像を長押しして保存してください'); }
       return;
     }
   } catch (e) {}
   if (await shareWithSheet(false)) return;
   try {
-    const a = document.createElement('a');
-    a.href = document.getElementById('result-img').src; a.download = '48group_songs.png';
-    document.body.appendChild(a); a.click(); a.remove();
+    [document.getElementById('result-img'), ...document.querySelectorAll('#result-more img')].forEach((im, i, all) => {
+      const a = document.createElement('a');
+      a.href = im.src; a.download = all.length > 1 ? `48group_songs_${i + 1}.png` : '48group_songs.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    });
   } catch (e) {}
   showToast('保存できないときは、画像を長押しして保存してください');
 }
@@ -2599,6 +2645,15 @@ async function shareToX() {
   const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText())}`;
   showToast('先に画像を保存して、Xの投稿画面で添付してください');
   setTimeout(() => { const w = window.open(url, '_blank'); if (!w) location.href = url; }, 900);
+}
+function showWhoAreYou() {
+  const ov = document.createElement('div'); ov.className = 'who-ov';
+  ov.innerHTML = `<div class="who-card"><div class="who-emoji">😳</div><p class="who-big">あなたは何者ですか？</p><p class="who-sub">全${SONGS.length}曲の順位を最後まで決めました。<br>おつかれさまでした！</p><button type="button">閉じる</button></div>`;
+  const close = () => ov.remove();
+  ov.onclick = e => { if (e.target === ov) close(); };
+  ov.querySelector('button').onclick = close;
+  document.body.appendChild(ov);
+  track('who_are_you', {});
 }
 function showToast(msg) {
   const t = document.getElementById('toast');
