@@ -471,6 +471,7 @@
   <div class="chips" id="sl-grp"></div>
   <div class="chips" id="sl-cat"></div>
   <div class="chips" id="sl-msort"></div>
+  <div class="chips hidden" id="sl-mdir" style="margin-top:-4px"></div>
   <div class="chips" id="sl-order"></div>
   <div class="sl-tools">
     <input class="search" id="sl-search" type="search" placeholder="曲名・メンバー名で検索" oninput="renderSongList()">
@@ -1318,11 +1319,14 @@ document.addEventListener('keydown', e => {
 });
 // 検索：曲名で絞った一覧（押すと詳細ポップアップ）
 function renderRankSearch(q, byKey) {
-  const nq = slNorm(q);
+  SL_STRICT = true;
+  let nq = slNorm(q);
+  if (!SONGS.some(s => (rkGrp === 'all' || s.a === rkGrp) && songHit(s, nq, false))) { SL_STRICT = false; nq = slNorm(q); }
   document.getElementById('rk-help').textContent = '曲名を押すと詳しく見られます（上のグループでも絞れます）';
   const { st, ptRank } = rkStats();
   const hits = SONGS.filter(s => (rkGrp === 'all' || s.a === rkGrp) && songHit(s, nq, false))
     .sort((a, b) => ((st.get(b) || {}).pt || 0) - ((st.get(a) || {}).pt || 0));
+  SL_STRICT = false;
   const box = document.getElementById('rk-list');
   box.innerHTML = hits.length ? '' : '<p class="empty-msg">見つかりませんでした</p>';
   if (hits.length) { const p = document.createElement('p'); p.className = 'help'; p.style.margin = '0 0 4px'; p.textContent = `${hits.length}曲`; box.appendChild(p); }
@@ -1722,8 +1726,8 @@ function songHit(s, q, more) {
     (more && (n(s.s).includes(q) || n(s.h).includes(q)));
 }
 function visibleSongs() {
-  const q = slNorm(document.getElementById('search').value);
-  return SONGS.filter(s => catOn.has(s.c) && grpOn.has(s.a) && songHit(s, q, true));
+  const raw = document.getElementById('search').value;
+  return strictFirst(() => { const q = slNorm(raw); return SONGS.filter(s => catOn.has(s.c) && grpOn.has(s.a) && songHit(s, q, true)); }, r => r.length > 0);
 }
 
 function renderList() {
@@ -2150,7 +2154,16 @@ async function drawResultImage(full, page = 0) {
 /* ---------- 楽曲一覧 ---------- */
 let slGrps = new Set(), slCats = new Set(), slOrder = 'date', slMode = 'song', slItems = [], slShown = 0, slObs = null, slLastG = null;
 const SL_STEP = 150;
-const slNorm = t => fuzzyKana(toHira((t || '').normalize('NFKC').toLowerCase().replace(/[\s・･、,.!！?？〜~ー\-'"’”]/g, '')));
+const slBase = t => toHira((t || '').normalize('NFKC').toLowerCase().replace(/[\s・･、,.!！?？〜~ー\-'"’”]/g, ''));
+// 検索はまず「そのままの音」で探し、見つからないときだけ近い音（濁点なし・ゔぁ＝ば など）でも探す
+//  例：「おき」は沖田・沖縄に当たり、「おぎ（小木曽・荻野）」までは広げない
+let SL_STRICT = false;
+const slNorm = t => SL_STRICT ? slBase(t) : fuzzyKana(slBase(t));
+function strictFirst(run, nonEmpty) {
+  SL_STRICT = true;
+  try { const r = run(); if (nonEmpty(r)) return r; } finally { SL_STRICT = false; }
+  return run();
+}
 /* 近い音をそろえる（ゔぁ→ば、っ・小さい字・のばし音の違いを無視）。検索語と曲名の両方にかけるので、近い音どうしで当たる */
 function fuzzyKana(t) {
   return t.replace(/ゔぁ/g, 'ば').replace(/ゔぃ/g, 'び').replace(/ゔぇ/g, 'べ').replace(/ゔぉ/g, 'ぼ').replace(/ゔ/g, 'ぶ')
@@ -2237,18 +2250,22 @@ function memberHits(q) {
   if (!q) return [];
   return MEMBERS.map((m, i) => i).filter(i => slNorm(MEMBERS[i][0]).includes(q) || (q.length >= 3 && slNorm(MEMBERS[i][2]).startsWith(q)));
 }
-function renderSongList(keep) {
-  const q = slNorm(document.getElementById('sl-search').value || '');
+function renderSongList(keep, fuzzy) {
+  const raw = document.getElementById('sl-search').value || '';
+  SL_STRICT = !fuzzy && !!raw.trim();
+  const q = slNorm(raw);
   const year = document.getElementById('sl-year').value;
   const box = document.getElementById('sl-list');
   if (slObs) { slObs.disconnect(); slObs = null; }
-  if (slMode === 'mem') { renderMemberList(q, year); return; }
+  if (slMode === 'mem') { renderMemberList(q, year); if (SL_STRICT && !slMemItems.length) { SL_STRICT = false; renderMemberList(slNorm(raw), year); } SL_STRICT = false; return; }
   document.getElementById('sl-help').textContent = '曲名を押すと、歌唱メンバーやみんなのランキングでの順位が見られます';
   const mh = memberHits(q);
   const mset = new Set(mh);
   slItems = SONGS.filter(s => inGrp(s.a) && (!slCats.size || slCats.has(s.c)) && (!year || songYear(s) === year) &&
     (!q || songHit(s, q, true) ||
       (mset.size && (SONG_MEM[s.id] || []).some(i => mset.has(i)))));
+  if (SL_STRICT && !slItems.length) { SL_STRICT = false; return renderSongList(keep, true); }
+  SL_STRICT = false;
   if (year || slOrder === 'date') slItems.sort((x, y) => dateKey(x).localeCompare(dateKey(y)) || SONG_IDX.get(x) - SONG_IDX.get(y));
   document.getElementById('sl-total').textContent = `${slItems.length}曲` + (slItems.length !== SONGS.length ? `（全${SONGS.length}曲中）` : '');
   const want = keep ? Math.max(slShown, SL_STEP) : SL_STEP;
@@ -2328,7 +2345,7 @@ function slAddMore(box, rest, fn) {
   }
 }
 // メンバーで見る：グループごとのメンバー一覧（歌っている曲が多い順）
-let slMemItems = [], slMemShown = 0, slMemSort = 'count', slMemLastHead = null;
+let slMemItems = [], slMemShown = 0, slMemSort = 'count', slMemDir = 'desc', slMemLastHead = null, slMemMatch = new Map(), slMemSplit = '';
 const MSORTS = [['count', '曲数順'], ['ki', '期生順'], ['kana', '五十音順'], ['age', '年齢順'], ['pref', '出身地順']];
 // 出身地の並び（北から南、そのあと海外）
 const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
@@ -2350,7 +2367,7 @@ function buildMemSortChips() {
   const box = document.getElementById('sl-msort');
   box.innerHTML = '';
   box.className = slMode === 'mem' ? 'msort' : 'chips';
-  if (slMode !== 'mem') return;
+  if (slMode !== 'mem') { const d = document.getElementById('sl-mdir'); if (d) { d.innerHTML = ''; d.classList.add('hidden'); } return; }
   const lb = document.createElement('span'); lb.className = 'msort-l'; lb.textContent = '並び順'; box.appendChild(lb);
   MSORTS.forEach(([k, label]) => {
     const b = document.createElement('button');
@@ -2359,9 +2376,20 @@ function buildMemSortChips() {
     b.onclick = () => { slMemSort = k; buildMemSortChips(); renderSongList(); };
     box.appendChild(b);
   });
+  // 曲数順のときだけ：多い順／少ない順の切り替え
+  const dir = document.getElementById('sl-mdir');
+  dir.innerHTML = '';
+  dir.classList.toggle('hidden', slMemSort !== 'count');
+  if (slMemSort === 'count') [['desc', '曲が多い順'], ['asc', '曲が少ない順']].forEach(([k, label]) => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'chip' + (slMemDir === k ? ' on' : ''); b.textContent = label;
+    b.onclick = () => { slMemDir = k; buildMemSortChips(); renderSongList(); };
+    dir.appendChild(b);
+  });
 }
 function memHead(i) {
   const [, g, r, ki, , , bd] = MEMBERS[i];
+  if (slMemSplit) return slMemMatch.get(i) === 'pref' ? `${MEMBERS[i][7]}出身の人` : `名前が「${slMemSplit}」の人`;
   const gp = slGrps.size !== 1 ? g + '　' : '';   // 「すべて」や複数のときはグループごと（AKB48から）
   if (slMemSort === 'ki') return ki ? gp + ki : (gp ? g : null);
   if (slMemSort === 'kana') return kanaRow(r);
@@ -2376,8 +2404,20 @@ function renderMemberList(q, year) {
   // 年を選んだときは、その年の1月1日に在籍していた人も（0曲でも）出す
   const D = year ? year + '-01-01' : null;
   const inTen = i => D && MEM_TEN[i].some(([g, j, l]) => inGrp(g) && j <= D && (!l || l >= D));
-  slMemItems = MEMBERS.map((m, i) => [i, cnt(i)]).filter(([i, c]) => ((c > 0 && inGrp(MEMBERS[i][1])) || inTen(i)) &&
-    (!q || slNorm(MEMBERS[i][0]).includes(q) || slNorm(MEMBERS[i][2]).includes(q) || prefHit(MEMBERS[i][7], q)));
+  // 名前で当たった人と、出身地（県名）で当たった人を分けて出す（「山口」「奈良」など）
+  const raw = (document.getElementById('sl-search').value || '').trim();
+  const prefOnlyQ = /[県府都道]$/.test(raw) || /(けん|ふ|と)$/.test(raw) && PREFS.some(pf => (PREF_READ[pf] || '') === raw);
+  const nameHit = i => !prefOnlyQ && (slNorm(MEMBERS[i][0]).includes(q) || slNorm(MEMBERS[i][2]).includes(q));
+  slMemMatch = new Map();
+  slMemItems = MEMBERS.map((m, i) => [i, cnt(i)]).filter(([i, c]) => {
+    if (!((c > 0 && inGrp(MEMBERS[i][1])) || inTen(i))) return false;
+    if (!q) return true;
+    if (nameHit(i)) { slMemMatch.set(i, 'name'); return true; }
+    if (prefHit(MEMBERS[i][7], q)) { slMemMatch.set(i, 'pref'); return true; }
+    return false;
+  });
+  const kinds = new Set(slMemMatch.values());
+  slMemSplit = kinds.size > 1 ? raw : '';
   const rd = i => MEMBERS[i][2] || '\uffff' + MEMBERS[i][0];
   const kanaCmp = (a, b) => rd(a).localeCompare(rd(b), 'ja');
   const gcmp = (a, b) => slGrps.size !== 1 ? GROUPS.indexOf(MEMBERS[a[0]][1]) - GROUPS.indexOf(MEMBERS[b[0]][1]) : 0;
@@ -2386,7 +2426,12 @@ function renderMemberList(q, year) {
   else if (slMemSort === 'kana') slMemItems.sort((a, b) => (kanaRow(MEMBERS[a[0]][2]) === '読み不明') - (kanaRow(MEMBERS[b[0]][2]) === '読み不明') || kanaCmp(a[0], b[0]));
   else if (slMemSort === 'pref') slMemItems.sort((a, b) => prefKey(MEMBERS[a[0]][7]) - prefKey(MEMBERS[b[0]][7]) || (MEMBERS[a[0]][7] || '').localeCompare(MEMBERS[b[0]][7] || '') || gcmp(a, b) || b[1] - a[1] || kanaCmp(a[0], b[0]));
   else if (slMemSort === 'age') slMemItems.sort((a, b) => bd(a[0]).localeCompare(bd(b[0])) || kanaCmp(a[0], b[0]));
-  else slMemItems.sort((a, b) => gcmp(a, b) || b[1] - a[1] || kanaCmp(a[0], b[0]));
+  else slMemItems.sort((a, b) => gcmp(a, b) || (slMemDir === 'asc' ? a[1] - b[1] : b[1] - a[1]) || kanaCmp(a[0], b[0]));
+  // 検索したとき：名前が検索語で始まる人 → 名前の途中に入っている人 → 出身地で当たった人 の順
+  if (q && slMemSplit) {
+    const rank = i => slMemMatch.get(i) === 'pref' ? 2 : (slNorm(MEMBERS[i][0]).startsWith(q) || slNorm(MEMBERS[i][2]).startsWith(q)) ? 0 : 1;
+    slMemItems.sort((a, b) => rank(a[0]) - rank(b[0]));
+  }
   slMemLastHead = null;
   document.getElementById('sl-total').textContent = `${slMemItems.length}人` + (year ? `（${year}年1月1日に在籍していた人・${year}年に歌った人）` : '');
   const box = document.getElementById('sl-list');
