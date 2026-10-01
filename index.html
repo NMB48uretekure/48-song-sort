@@ -207,6 +207,16 @@
   .mems .chips { justify-content: flex-start; margin: 0; gap: 5px; }
   .mchip { padding: 4px 9px; font-size: 12px; border-radius: 999px; background: #fff; color: #333; border: 1.5px solid var(--line); font-weight: bold; }
   .mchip:active { opacity: .6; }
+  .share-ov { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  @media (min-width: 768px) { .share-ov { align-items: center; } }
+  .share-card { background: #fff; border-radius: 20px; padding: 18px 16px 12px; width: 100%; max-width: 400px; display: grid; gap: 8px; animation: whoPop .3s ease; }
+  .share-h { margin: 0 0 4px; font-weight: 900; font-size: 16px; text-align: center; color: #333; }
+  .share-note { margin: 0; font-size: 11px; color: #999; text-align: center; }
+  .share-btn { width: 100%; padding: 13px; border-radius: 14px; font-size: 15px; text-align: center; }
+  .share-btn.main { background: var(--main); color: #fff; }
+  .share-btn.line { background: #06c755; color: #fff; }
+  .share-btn.sub { background: var(--sub); color: var(--main-dark); }
+  .share-btn.cancel { background: none; color: #999; font-weight: normal; }
   .who-ov { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: whoIn .25s ease; }
   .who-card { background: #fff; border-radius: 22px; padding: 28px 22px 22px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.25); animation: whoPop .45s cubic-bezier(.2,1.6,.4,1); }
   .who-emoji { font-size: 56px; line-height: 1; }
@@ -412,7 +422,8 @@
   <p class="help" id="result-pages"></p>
   <p class="help" id="save-hint">画像を長押ししても保存できます</p>
   <button class="btn-wide btn-twitter" onclick="shareToX()">𝕏 に画像つきで投稿する</button>
-  <button class="btn-wide" onclick="saveImage()">画像を保存する</button>
+  <button class="btn-wide" onclick="shareResultSheet()">LINEなどで送る（画像＋リンク）</button>
+  <button class="btn-wide btn-light" onclick="saveImage()">画像を保存する</button>
   <div id="first-notice" class="first-notice hidden"></div>
   <div class="rank-promo" id="rank-promo">
     <p class="rp-title">みんなの人気曲ランキング</p>
@@ -2541,14 +2552,40 @@ async function shareSong(s) {
 async function shareImage(blob, name, text) {
   track('share', { file_name: name });
   let file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
-  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
-  }
+  const m = text.match(/https?:\/\/\S+/);
+  openShareSheet({ files: file ? [file] : [], blobs: [blob], names: [name], text, url: m ? m[0] : '' });
+}
+/* 共有のしかたを選ぶ画面（LINEなどで「画像＋リンク」を送れるように）。ボタンを押した瞬間に共有するので、スマホでも確実に開く */
+function openShareSheet(o) {
+  const old = document.querySelector('.share-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.className = 'share-ov';
+  const card = document.createElement('div'); card.className = 'share-card'; ov.appendChild(card);
+  const h = document.createElement('p'); h.className = 'share-h'; h.textContent = '共有する'; card.appendChild(h);
+  const close = () => ov.remove();
+  ov.onclick = e => { if (e.target === ov) close(); };
+  const btn = (label, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'share-btn ' + cls; b.textContent = label; b.onclick = fn; card.appendChild(b); return b; };
+  const canFiles = o.files.length && navigator.canShare && (() => { try { return navigator.canShare({ files: o.files }); } catch (e) { return false; } })();
+  if (canFiles) btn(o.url ? '📷 画像とリンクを送る（LINE・Xなど）' : '📷 画像と文章を送る（LINE・Xなど）', 'main', async () => {
+    try { await navigator.share({ files: o.files, text: o.text }); close(); } catch (e) { if (e && e.name !== 'AbortError') showToast('共有できませんでした'); }
+  });
+  btn('💬 LINEで送る（文章とリンク）', 'line', () => { window.open('https://line.me/R/share?text=' + encodeURIComponent(o.text), '_blank'); close(); });
+  if (o.url) btn('🔗 リンクをコピー', 'sub', async () => {
+    try { await navigator.clipboard.writeText(o.url); showToast('リンクをコピーしました'); }
+    catch (e) { prompt('このリンクをコピーしてください', o.url); }
+    close();
+  });
+  btn(o.blobs.length > 1 ? `💾 画像を保存（${o.blobs.length}枚）` : '💾 画像を保存', 'sub', async () => { close(); await saveBlobs(o.blobs, o.names); });
+  btn('閉じる', 'cancel', close);
+  if (o.files.length && !canFiles) { const n = document.createElement('p'); n.className = 'share-note'; n.textContent = 'このブラウザは画像の直接共有に対応していません。画像を保存してから、LINEなどで送ってください'; card.insertBefore(n, card.children[1]); }
+  document.body.appendChild(ov);
+}
+async function saveBlobs(blobs, names) {
   try {
     const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
-    if (dl) { try { await dl.save({ filename: name, data: blob }); showToast('画像を保存しました'); } catch (e) {} return; }
+    if (dl) { for (let k = 0; k < blobs.length; k++) { try { await dl.save({ filename: names[k], data: blobs[k] }); } catch (e) {} } showToast('画像を保存しました'); return; }
   } catch (e) {}
-  try { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); showToast('画像を保存しました'); } catch (e) {}
+  blobs.forEach((b, k) => { try { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = names[k]; document.body.appendChild(a); a.click(); a.remove(); } catch (e) {} });
+  showToast(IS_MOUSE ? '画像を保存しました' : '保存できないときは、画像を長押しして保存してください');
 }
 // メンバーのページを画像に：歌っている曲のリスト（多いときは表題曲と人気曲を中心に選ぶ）
 const CAT_ORDER = ['表題曲', 'カップリング', 'アルバム', 'ユニット', 'ソロ', '公演曲'];
@@ -2581,7 +2618,7 @@ async function drawMemberCard(i) {
   // カテゴリ別の曲数（0のものは出さない）
   const cc = {}; songs.forEach(x => cc[x.c] = (cc[x.c] || 0) + 1);
   const cats = CAT_ORDER.filter(c => cc[c]).map(c => [c, cc[c]]);
-  const top = 380, listH = rows * rowH;
+  const top = (MEMBERS[i][6] || MEMBERS[i][7]) ? 420 : 380, listH = rows * rowH;
   const H = top + (note ? 50 : 0) + listH + 150;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const ctx = c.getContext('2d');
@@ -2590,12 +2627,16 @@ async function drawMemberCard(i) {
   const col = GCOLOR[g] || '#e0457b';
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#333';
   ctx.fillText(fitText(ctx, name, W - 200, 74, 'bold', 0.5), X0, 150);
-  ctx.fillStyle = '#888'; ctx.font = `30px ${FONT}`;
-  ctx.fillText([g, ki].filter(Boolean).join('・'), X0, 208);
+  // グループ・期生／出身地・生年月日
+  const [, , , , , , bdy, pref] = MEMBERS[i];
+  ctx.fillStyle = '#777'; ctx.font = `30px ${FONT}`;
+  ctx.fillText(fitText(ctx, [g, ki].filter(Boolean).join('・'), W - 200, 30, 'normal', 0.6), X0, 206);
+  const l2 = [pref ? pref + '出身' : '', bdy ? fmtDate(bdy) + '生まれ' : ''].filter(Boolean).join('・');
+  if (l2) { ctx.fillStyle = '#888'; ctx.fillText(fitText(ctx, l2, W - 200, 28, 'normal', 0.6), X0, 250); }
   ctx.fillStyle = col; ctx.font = `bold 38px ${FONT}`;
-  ctx.fillText(`歌っている曲 ${songs.length}曲`, X0, 262);
+  ctx.fillText(`歌っている曲 ${songs.length}曲`, X0, l2 ? 306 : 262);
   // カテゴリのチップ
-  let px = X0, py = 300;
+  let px = X0, py = l2 ? 340 : 300;
   ctx.font = `bold 24px ${FONT}`;
   cats.forEach(([c2, n]) => {
     const t = `${c2} ${n}`, w = ctx.measureText(t).width + 32;
@@ -2681,6 +2722,12 @@ function renderContact(c) {
   };
   w.appendChild(send);
   card.appendChild(w);
+}
+function shareResultSheet() {
+  if (!resultBlob) { showToast('画像を作成中です。少し待ってください'); return; }
+  const fs = resultFiles();
+  track('share', { file_name: 'result' });
+  openShareSheet({ files: fs, blobs: fs, names: fs.map(f => f.name), text: shareText(), url: pageUrl() });
 }
 async function shareToX() {
   if (!resultBlob) { showToast('画像を作成中です。少し待ってください'); return; }
