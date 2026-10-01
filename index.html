@@ -469,7 +469,7 @@
 <div id="resume-box" class="step-container resume-box hidden">
   <p class="resume-msg" id="resume-msg">前回のソートが途中です</p>
   <button class="btn-wide" onclick="resumeSort()">続きから再開する</button>
-  <button class="btn-wide btn-light" onclick="discardResume()">最初からやる</button>
+  <button class="btn-wide btn-light" onclick="discardResume()">最初からやり直す</button>
 </div>
 
 <div id="phase1" class="step-container">
@@ -481,7 +481,7 @@
     <div class="chips" id="grp-chips"></div>
   </div>
   <div class="pick-sec pick-sec2">
-    <p class="pick-label"><span class="step">2</span>曲の種類をしぼる</p>
+    <p class="pick-label"><span class="step">2</span>曲の種類を絞る</p>
     <p class="pick-sub">はじめは全部選ばれています</p>
     <div class="chips" id="cat-chips"></div>
   </div>
@@ -587,7 +587,7 @@
   </div>
   <div class="sl-tools">
     <input class="search" id="sl-search" type="search" placeholder="曲名・メンバー名で検索" oninput="renderSongList()">
-    <select id="sl-year" onchange="renderSongList()" aria-label="年でしぼる"></select>
+    <select id="sl-year" onchange="renderSongList()" aria-label="年で絞る"></select>
   </div>
   <button type="button" class="ftog" id="sl-ftog" onclick="toggleSlFilter()" aria-expanded="false">
     <span class="ftog-ic">⚙︎</span><span class="ftog-l">絞り込み・並び順</span><span class="ftog-sum" id="sl-fsum"></span><span class="ftog-ar">›</span>
@@ -603,7 +603,7 @@
   </div></div>
   <p class="help" id="sl-help" style="margin:4px 0 6px"></p>
   <div id="sl-list"></div>
-  <p class="help" style="margin:10px 0 0">※歌唱メンバーや発売日などは個人で調べたもので、正しいとは限りません</p>
+  <p class="help" style="margin:10px 0 0">※歌唱メンバーや発売日などは個人で調べたものなので、正しいとは限りません。</p>
   <button class="btn-wide" onclick="closeSongList()">ソートに戻る</button>
 </div>
 
@@ -2278,9 +2278,9 @@ async function drawResultImage(full, page = 0) {
   ctx.fillStyle = RESULT_THEME.main; ctx.font = `bold 64px ${FONT}`;
   if (pages > 1) {
     ctx.font = `bold 56px ${FONT}`;
-    ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲 TOP${total}`, W / 2, 186);
+    ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲TOP${total}`, W / 2, 186);
     ctx.fillStyle = '#999'; ctx.font = `bold 30px ${FONT}`; ctx.fillText(`${off + 1}〜${off + list.length}位（${page + 1}/${pages}）`, W / 2, 228);
-  } else ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲 TOP${total}`, W / 2, 194);
+  } else ctx.fillText(`${RESULT_THEME.group || '48グループ'} 好きな曲TOP${total}`, W / 2, 194);
 
   const rankOf = i => finalRanks[off + i] || off + i + 1;
   if (!wide) {
@@ -2545,7 +2545,7 @@ const careerDays = i => {
   for (const [a, b] of iv.slice(1)) { if (a <= ce) ce = Math.max(ce, b); else { tot += ce - cs; [cs, ce] = [a, b]; } }
   return Math.round((tot + ce - cs) / 864e5);
 };
-// 在籍期間（重なりをまとめた区間ごと）を「○年○か月○日」に。区間が複数ある人は足し合わせる
+// 在籍期間（重なりをまとめた区間ごと）を「○年○ヶ月○日」に。区間が複数ある人は足し合わせる
 const careerSpans = i => {
   const iv = (MEM_TEN[i] || []).filter(t => t[1]).map(t => [t[1], t[2] || TODAY]).filter(x => x[1] >= x[0]).sort((a, b) => a[0] < b[0] ? -1 : 1);
   const out = [];
@@ -2567,7 +2567,7 @@ const careerYMD = i => {
   if (m >= 12) { y += Math.floor(m / 12); m %= 12; }
   return [y, m, d];
 };
-const careerText = i => { const r = careerYMD(i); if (!r) return '在籍期間不明'; const [y, m, d] = r; return (y ? y + '年' : '') + (m ? m + 'か月' : '') + (d || (!y && !m) ? d + '日' : ''); };
+const careerText = i => { const r = careerYMD(i); if (!r) return '在籍期間不明'; const [y, m, d] = r; return (y ? y + '年' : '') + (m ? m + 'ヶ月' : '') + (d || (!y && !m) ? d + '日' : ''); };
 // 日付が変わったら（ページを開いたまま日をまたいだ時も）芸歴を更新
 setInterval(() => { const t = localDate(); if (t !== TODAY) { TODAY = t; try { if (typeof slMemSort !== 'undefined' && slMemSort === 'career' && typeof renderSongList === 'function') renderSongList(true); } catch (e) {} } }, 60000);
 // 出身地の並び（北から南、そのあと海外）
@@ -2864,13 +2864,13 @@ function openShareSheet(o) {
   try { document.getElementById('toast').classList.remove('show'); } catch (e) {}
   const ov = document.createElement('div'); ov.className = 'share-ov';
   const card = document.createElement('div'); card.className = 'share-card'; ov.appendChild(card);
-  const h = document.createElement('p'); h.className = 'share-h'; h.textContent = '共有する'; card.appendChild(h);
+  const h = document.createElement('p'); h.className = 'share-h'; h.textContent = 'シェアする'; card.appendChild(h);
   const close = () => ov.remove();
   ov.onclick = e => { if (e.target === ov) close(); };
   const btn = (label, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'share-btn ' + cls; b.textContent = label; b.onclick = fn; card.appendChild(b); return b; };
   const canFiles = o.files.length && navigator.canShare && (() => { try { return navigator.canShare({ files: o.files }); } catch (e) { return false; } })();
   if (canFiles) btn(o.url ? '📷 画像とリンクを送る（LINE・Xなど）' : '📷 画像と文章を送る（LINE・Xなど）', 'main', async () => {
-    try { await navigator.share({ files: o.files, text: o.text }); close(); } catch (e) { if (e && e.name !== 'AbortError') showToast('共有できませんでした'); }
+    try { await navigator.share({ files: o.files, text: o.text }); close(); } catch (e) { if (e && e.name !== 'AbortError') showToast('シェアできませんでした'); }
   });
   btn('💬 LINEで送る（文章とリンク）', 'line', () => { window.open('https://line.me/R/share?text=' + encodeURIComponent(o.text), '_blank'); close(); });
   if (o.url) btn('🔗 リンクをコピー', 'sub', async () => {
@@ -2880,7 +2880,7 @@ function openShareSheet(o) {
   });
   btn(o.blobs.length > 1 ? `💾 画像を保存（${o.blobs.length}枚）` : '💾 画像を保存', 'sub', async () => { close(); await saveBlobs(o.blobs, o.names); });
   btn('閉じる', 'cancel', close);
-  if (o.files.length && !canFiles) { const n = document.createElement('p'); n.className = 'share-note'; n.textContent = 'このブラウザは画像の直接共有に対応していません。画像を保存してから、LINEなどで送ってください'; card.insertBefore(n, card.children[1]); }
+  if (o.files.length && !canFiles) { const n = document.createElement('p'); n.className = 'share-note'; n.textContent = 'このブラウザは画像のシェアに対応していません。画像を保存してから、LINEなどで送ってください'; card.insertBefore(n, card.children[1]); }
   document.body.appendChild(ov);
 }
 async function saveBlobs(blobs, names) {
@@ -3056,7 +3056,7 @@ async function drawRankCard() {
   ctx.fillText(`${grp || '48グループ'}　${RK_LABEL[rkKind] || ''}`, W / 2, 148);
   const d = new Date();
   ctx.fillStyle = '#777'; ctx.font = `500 24px ${FONT}`;
-  ctx.fillText(`${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} 時点・${rkRows.length}件の結果から集計`, W / 2, 192);
+  ctx.fillText(`${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日時点・${rkRows.length}件の結果から集計`, W / 2, 192);
   const jk = await Promise.all(items.map(it => loadJacket(it.s.j).catch(() => null)));
   const colW = (W - pad * 2 - gap * (cols - 1)) / cols;
   items.forEach((it, i) => {
@@ -3095,7 +3095,7 @@ async function shareRanking() {
   showToast('画像を作成中…');
   let blob = null;
   try { blob = await drawRankCard(); } catch (e) { console.error(e); }
-  if (!blob) { showToast('画像を作れませんでした'); return; }
+  if (!blob) { showToast('画像を作成できませんでした'); return; }
   try { document.getElementById('toast').classList.remove('show'); } catch (e) {}
   const g = rkGrp === 'all' ? '48グループ' : rkGrp, u = pageUrl();
   await shareImage(blob, 'ranking.png', `みんなの人気曲ランキング（${g}・${RK_LABEL[rkKind]}）\n#48G楽曲ソート` + (u ? '\n' + u.split('?')[0] + '?view=rank' : ''));
