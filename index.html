@@ -172,6 +172,18 @@
   .adm-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .adm-row2 .adm-go { margin-top: 12px; font-size: 14px; }
   .adm-gray { background: #eee !important; color: #555 !important; }
+  .adm-sg { position: relative; }
+  .adm-sgl { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin: 2px 0 0; padding: 4px 0; list-style: none; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.15); max-height: 260px; overflow-y: auto; }
+  .adm-sgl li { padding: 9px 12px; font-size: 15px; cursor: pointer; }
+  .adm-sgl li small { color: #999; font-size: 11px; margin-left: 6px; }
+  .adm-sgl li:active, .adm-sgl li.on { background: var(--sub); }
+  .adm-ten { display: grid; grid-template-columns: 1fr 1fr 34px; gap: 4px 6px; align-items: end; margin-top: 8px; padding: 8px; border: 1.5px dashed var(--line); border-radius: 12px; }
+  .adm-ten > select { grid-column: 1 / -1; }
+  .adm-card .adm-ten label { margin: 0; font-size: 11px; font-weight: normal; color: #888; min-width: 0; }
+  .adm-ten select, .adm-ten input { font-size: 14px !important; padding: 7px 4px !important; }
+  .adm-ten input[type=date] { min-height: 38px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23c0577f' stroke-width='2'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E") no-repeat right 6px center; }
+  .adm-ten .adm-del { height: 36px; padding: 0; background: #eee; color: #888; }
+  .mtop .medit { margin-right: auto; padding: 6px 12px; font-size: 12px; border-radius: 999px; background: #333; color: #fff; }
   .adm-out { display: block; margin: 14px auto 0; padding: 6px 12px; font-size: 12px; background: none; color: #999; text-decoration: underline; }
   .adm-prev { width: 120px; height: 120px; border-radius: 10px; margin-top: 8px; object-fit: cover; }
 
@@ -3516,6 +3528,12 @@ function memAvatar(i) {
 function modalTopBar(card) {
   const top = document.createElement('div'); top.className = 'mtop';
   if (modalStack.length > 1) { const bk = document.createElement('button'); bk.textContent = TR('← 戻る'); bk.onclick = songModalBack; top.appendChild(bk); }
+  const cur = modalStack[modalStack.length - 1];
+  if (cur && !cur.contact && typeof adminToken === 'function' && adminToken()) {
+    const ed = document.createElement('button'); ed.className = 'medit'; ed.textContent = '✏️ 編集';
+    ed.onclick = () => adminPanel(cur.mem != null ? { mem: cur.mem } : { song: cur });
+    top.appendChild(ed);
+  }
   const cl = document.createElement('button'); cl.className = 'mclose'; cl.textContent = '✕'; cl.setAttribute('aria-label', TR('閉じる')); cl.onclick = closeSongModal;
   top.appendChild(cl);
   card.appendChild(top);
@@ -5792,6 +5810,14 @@ function admImage(file) {
 
 // --- 画面 ---
 const ADM_PREFIX = { AKB48: 'akb', SKE48: 'ske', NMB48: 'nmb', HKT48: 'hkt', NGT48: 'ngt', STU48: 'stu', SDN48: 'sdn' };
+// 期の並び順の数字：同じグループ・同じ期の人と同じ／「○期生」なら 1000+○／それ以外は加入日から
+function admKiOrder(G, ki, join, dflt = 9999) {
+  const same = ki && MEMBERS.find(m => m[1] === G && m[3] === ki);
+  const km = ki.match(/^(\d+(?:\.\d+)?)期生$/);
+  if (same) return same[4]; if (km) return 1000 + Number(km[1]);
+  if (join) { const d = new Date(join); return Math.round((d.getFullYear() + (d - new Date(d.getFullYear(), 0, 1)) / 864e5 / 366) * 1000) / 1000; }
+  return dflt;
+}
 function admSongLabel(s) { return `${s.t}（${s.a}・${s.h || ''}）`; }
 function admFindSong(v) { v = (v || '').trim(); return SONGS.find(s => admSongLabel(s) === v) || (SONGS.filter(s => s.t === v).length === 1 ? SONGS.find(s => s.t === v) : null); }
 function adminLogin() {
@@ -5809,16 +5835,14 @@ function adminLogin() {
     adminPanel();
   };
 }
-function adminPanel() {
+function adminPanel(open) {
   if (!adminToken()) { adminLogin(); return; }
   document.getElementById('adm-ov')?.remove();
   const ov = document.createElement('div'); ov.id = 'adm-ov'; ov.className = 'adm-ov';
-  const opts = SONGS.map(s => `<option value="${admSongLabel(s).replace(/"/g, '&quot;')}">`).join('');
-  const memOpts = MEMBERS.map(m => `<option value="${m[0]}">`).join('');
   ov.innerHTML = `<div class="adm-card">
     <div class="adm-top"><b>🛠 管理画面</b><button type="button" class="adm-x" onclick="document.getElementById('adm-ov').remove()">✕</button></div>
-    <div class="adm-tabs"><button data-t="add" class="on">曲を追加</button><button data-t="mem">メンバー修正</button><button data-t="jk">ジャケ写</button><button data-t="info">曲名・発売日</button><button data-t="newm">メンバー追加</button><button data-t="grad">卒業</button><button data-t="undo">元に戻す</button></div>
-    <datalist id="adm-songs">${opts}</datalist><datalist id="adm-mems">${memOpts}</datalist>
+    <div class="adm-tabs"><button data-t="add" class="on">曲を追加</button><button data-t="mem">メンバー修正</button><button data-t="jk">ジャケ写</button><button data-t="info">曲名・発売日</button><button data-t="newm">メンバー追加</button><button data-t="grad">メンバー情報</button><button data-t="undo">元に戻す</button></div>
+    
 
     <section data-p="add">
       <label>グループ</label><select id="ad-g">${GROUPS.map(g => `<option>${g}</option>`).join('')}</select>
@@ -5835,15 +5859,15 @@ function adminPanel() {
     </section>
 
     <section data-p="mem" hidden>
-      <label>曲</label><input id="am-song" list="adm-songs" placeholder="曲名を入れて候補から選ぶ">
+      <label>曲</label><input id="am-song" placeholder="曲名を入れて候補から選ぶ">
       <label>歌唱メンバー（「、」区切り）</label><textarea id="am-mem" rows="5"></textarea>
-      <label>センター（「、」区切り・なければ空）</label><input id="am-cen" list="adm-mems">
+      <label>センター（「、」区切り・なければ空）</label><input id="am-cen">
       <p class="adm-note" id="am-info"></p>
       <button type="button" class="adm-go" id="am-save">GitHubに保存する</button>
     </section>
 
     <section data-p="jk" hidden>
-      <label>曲（同じシングル・アルバムの曲は全部同じジャケ写になります）</label><input id="aj-song" list="adm-songs" placeholder="曲名を入れて候補から選ぶ">
+      <label>曲（同じシングル・アルバムの曲は全部同じジャケ写になります）</label><input id="aj-song" placeholder="曲名を入れて候補から選ぶ">
       <label>新しいジャケ写</label><input id="aj-file" type="file" accept="image/*">
       <img id="aj-prev" class="adm-prev" alt="" hidden>
       <button type="button" class="adm-go" id="aj-save">GitHubに保存する</button>
@@ -5861,10 +5885,16 @@ function adminPanel() {
     </section>
 
     <section data-p="grad" hidden>
-      <label>メンバー</label><input id="ag-name" list="adm-mems" placeholder="名前を入れて候補から選ぶ">
-      <p class="adm-note" id="ag-info"></p>
-      <label>卒業日（予定日でもOK。その日までは現役として出ます）</label><input id="ag-date" type="date">
-      <div class="adm-row2"><button type="button" class="adm-go" id="ag-save">卒業にする</button><button type="button" class="adm-go adm-gray" id="ag-undo">卒業を取り消す</button></div>
+      <label>メンバー</label><input id="ag-name" placeholder="名前か読みを入れて候補から選ぶ" autocomplete="off">
+      <div id="ag-form" hidden>
+        <div class="adm-row"><div><label>名前</label><input id="ag-n"></div><div><label>読み（名字と名前のあいだにスペース）</label><input id="ag-read"></div></div>
+        <div class="adm-row"><div><label>グループ</label><select id="ag-g">${GROUPS.map(g => `<option>${g}</option>`).join('')}</select></div><div><label>期</label><input id="ag-ki"></div></div>
+        <div class="adm-row"><div><label>生年月日</label><input id="ag-birth" type="date"></div><div><label>出身地</label><input id="ag-pref" placeholder="広島県"></div></div>
+        <label>在籍期間（日付をタップするとカレンダーが出ます。卒業日が空なら在籍中・予定日でもOK）</label>
+        <div id="ag-tens"></div>
+        <button type="button" class="adm-sub" id="ag-addten">＋ 在籍期間を足す（移籍・兼任）</button>
+        <button type="button" class="adm-go" id="ag-save">GitHubに保存する</button>
+      </div>
     </section>
 
     <section data-p="undo" hidden>
@@ -5875,7 +5905,7 @@ function adminPanel() {
     </section>
 
     <section data-p="info" hidden>
-      <label>曲</label><input id="ai-song" list="adm-songs" placeholder="曲名を入れて候補から選ぶ">
+      <label>曲</label><input id="ai-song" placeholder="曲名を入れて候補から選ぶ">
       <label>曲名</label><input id="ai-t">
       <label>種類</label><select id="ai-c">${CATS.map(c => `<option>${c}</option>`).join('')}</select>
       <label>収録の表示（例：STU48 14枚目シングル（表題曲））</label><input id="ai-s">
@@ -5895,22 +5925,78 @@ function adminPanel() {
   });
   $('adm-logout').onclick = () => { if (!confirm('この端末からトークンを消しますか？')) return; try { localStorage.removeItem(ADMIN_TOKEN_KEY); } catch (e) {} ov.remove(); showToast('トークンを消しました'); };
 
-  // ---- 卒業 ----
-  const showTen = t => (t || '').split(';').filter(Boolean).map(x => { const [g, j, l] = x.split('|'); return `${g}：${j || '?'} 〜 ${l || '在籍中'}`; }).join('<br>');
-  const agIdx = () => adminFindMember($('ag-name').value);
-  $('ag-name').oninput = () => { const i = agIdx(); $('ag-info').innerHTML = i < 0 ? ($('ag-name').value ? '<b class="adm-bad">見つかりません</b>' : '') : `${MEMBERS[i][1]}・${MEMBERS[i][3] || ''}<br>${showTen(MEMBERS[i][5]) || '<b class="adm-bad">在籍期間のデータがありません</b>'}`; };
-  const agRun = (btn, grad) => busy(btn, async () => {
-    const i = agIdx(); if (i < 0) throw new Error('メンバーを選んでください');
-    const date = grad ? $('ag-date').value : null;
-    if (grad && !date) throw new Error('卒業日を入れてください');
-    const nt = adminNewTen(MEMBERS[i][5], date); if (!nt) throw new Error('在籍期間のデータがないので変えられません');
-    if (!confirm(`${MEMBERS[i][0]}\n\n${showTen(nt).replace(/<br>/g, '\n')}\n\nこう保存しますか？`)) return;
-    const saved = await adminCommitTen(MEMBERS[i][0], t => adminNewTen(t, date), grad ? `卒業：${MEMBERS[i][0]}（${date}）` : `卒業取り消し：${MEMBERS[i][0]}`);
-    adminApplyLocal(i, saved); $('ag-name').oninput();
+  // ---- 候補（ひらがなの読みでも出る） ----
+  const nq = t => toHira((t || '').normalize('NFKC').toLowerCase().replace(/[\s・、,]/g, ''));
+  const memHits = q => { q = nq(q); if (!q) return []; const a = [], b = [];
+    MEMBERS.forEach((m, i) => { const n = nq(m[0]), r = nq(m[2]); if (n.startsWith(q) || r.startsWith(q)) a.push(i); else if (n.includes(q) || r.includes(q)) b.push(i); });
+    return [...a, ...b].slice(0, 30).map(i => ({ v: MEMBERS[i][0], sub: `${MEMBERS[i][1]}・${MEMBERS[i][3] || ''}${memGraduated && memGraduated(i) ? '・卒業' : ''}` })); };
+  const songHits = q => { q = nq(q); if (!q) return []; const a = [], b = [];
+    SONGS.forEach(x => { const n = nq(x.t), r = nq((SONG_READ[x.id] || '').split(' ')[0]); if (n.startsWith(q) || r.startsWith(q)) a.push(x); else if (n.includes(q) || r.includes(q)) b.push(x); });
+    return [...a, ...b].slice(0, 30).map(x => ({ v: admSongLabel(x), label: x.t, sub: `${x.a}・${x.h || ''}` })); };
+  // multi: 「、」区切りの最後の名前だけを補う
+  function suggest(inp, hits, multi) {
+    const wrap = document.createElement('div'); wrap.className = 'adm-sg'; inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+    const ul = document.createElement('ul'); ul.className = 'adm-sgl'; ul.hidden = true; wrap.appendChild(ul);
+    const sep = /[、,，\n]/;
+    const cur = () => { const v = inp.value; if (!multi) return v; const k = Math.max(...['、', ',', '，', '\n'].map(c => v.lastIndexOf(c))); return v.slice(k + 1); };
+    const show = () => { const h = hits(cur()); if (!h.length || (h.length === 1 && h[0].v === cur().trim())) { ul.hidden = true; return; }
+      ul.innerHTML = h.map((x, k) => `<li data-k="${k}">${(x.label || x.v).replace(/</g, '&lt;')}<small>${x.sub.replace(/</g, '&lt;')}</small></li>`).join(''); ul.hidden = false;
+      ul.querySelectorAll('li').forEach(li => li.onmousedown = li.ontouchstart = ev => { ev.preventDefault(); const x = h[+li.dataset.k];
+        if (multi) { const v = inp.value, c = cur(); inp.value = v.slice(0, v.length - c.length) + x.v + '、'; } else inp.value = x.v;
+        ul.hidden = true; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); if (multi) inp.focus(); else inp.blur(); }); };
+    inp.addEventListener('input', show); inp.addEventListener('focus', show); inp.addEventListener('compositionupdate', () => setTimeout(show, 0));
+    inp.addEventListener('blur', () => setTimeout(() => { ul.hidden = true; }, 150));
+  }
+  ['am-song', 'aj-song', 'ai-song'].forEach(id => suggest($(id), songHits));
+  ['ag-name'].forEach(id => suggest($(id), memHits));
+  ['am-mem', 'am-cen'].forEach(id => suggest($(id), memHits, true));
+  window.__admSuggestRow = d => d.querySelectorAll('.r-m,.r-cen').forEach(x => suggest(x, memHits, true));
+  setTimeout(() => {
+    $('ad-songs').querySelectorAll('.adm-song').forEach(d => window.__admSuggestRow(d));
+    if (open && open.mem != null) { $('ag-name').value = MEMBERS[open.mem][0]; $('ag-name').onchange(); ov.querySelector('.adm-tabs button[data-t=grad]').click(); }
+    if (open && open.song) { const v = admSongLabel(open.song); ['am-song', 'aj-song', 'ai-song'].forEach(id => { $(id).value = v; $(id).onchange && $(id).onchange(); }); ov.querySelector('.adm-tabs button[data-t=info]').click(); }
+  }, 0);
+
+  // ---- メンバー情報（卒業もここ） ----
+  let gIdx = -1;
+  const tenRow = (t = []) => { const d = document.createElement('div'); d.className = 'adm-ten';
+    d.innerHTML = `<select>${GROUPS.map(g => `<option${g === t[0] ? ' selected' : ''}>${g}</option>`).join('')}</select><label>加入日<input type="date" value="${t[1] || ''}"></label><label>卒業日（空なら在籍中）<input type="date" value="${t[2] || ''}"></label><button type="button" class="adm-del">✕</button>`;
+    d.querySelector('.adm-del').onclick = () => d.remove(); $('ag-tens').appendChild(d); };
+  $('ag-addten').onclick = () => tenRow([$('ag-g').value]);
+  $('ag-name').onchange = () => {
+    gIdx = adminFindMember($('ag-name').value); $('ag-form').hidden = gIdx < 0; if (gIdx < 0) return;
+    const m = MEMBERS[gIdx];
+    $('ag-n').value = m[0]; $('ag-read').value = m[8] || m[2] || ''; $('ag-g').value = m[1]; $('ag-ki').value = m[3] || ''; $('ag-birth').value = m[6] || ''; $('ag-pref').value = m[7] || '';
+    $('ag-tens').innerHTML = ''; (m[5] || '').split(';').filter(Boolean).forEach(x => tenRow(x.split('|')));
+    if (!$('ag-tens').children.length) tenRow([m[1]]);
+  };
+  $('ag-save').onclick = () => busy($('ag-save'), async () => {
+    if (gIdx < 0) throw new Error('メンバーを選んでください');
+    const old = MEMBERS[gIdx], oldName = old[0];
+    const name = $('ag-n').value.replace(/\s/g, ''), read = $('ag-read').value.trim().replace(/[\s　]+/g, ' '), G = $('ag-g').value, ki = $('ag-ki').value.trim();
+    if (!name) throw new Error('名前が空です');
+    if (name !== oldName && ADM_NAME.has(name)) throw new Error(name + ' はもういます');
+    if (read && !/^[ぁ-んー ]+$/.test(read)) throw new Error('読みはひらがなで入れてください');
+    const tens = [...$('ag-tens').children].map(d => { const [g, j, l] = d.querySelectorAll('select,input'); return [g.value, j.value, l.value]; }).filter(t => t[1] || t[2]);
+    if (tens.some(t => t[1] && t[2] && t[2] < t[1])) throw new Error('卒業日が加入日より前になっています');
+    const od = (ki === old[3] && G === old[1]) ? old[4] : admKiOrder(G, ki, tens[0] && tens[0][1], old[4]);
+    const row = [name, G, read.replace(/ /g, ''), ki, od, tens.map(t => t.join('|')).join(';'), $('ag-birth').value, $('ag-pref').value.trim(), read.includes(' ') ? read : (old[8] && read.replace(/ /g, '') === old[2] ? old[8] : '')];
+    const show = r => `${r[0]}（${r[8] || r[2] || '読みなし'}）\n${r[1]}・${r[3] || '期なし'}\n生年月日：${r[6] || '不明'}　出身：${r[7] || '不明'}\n在籍：\n` + (r[5] ? r[5].split(';').map(x => { const [g, j, l] = x.split('|'); return `　${g}：${j || '?'} 〜 ${l || '在籍中'}`; }).join('\n') : '　不明');
+    if (JSON.stringify(row) === JSON.stringify(old)) throw new Error('変更がありません');
+    if (!confirm(`${show(row)}\n\nこう保存しますか？`)) return;
+    const grad = tens.some((t, k) => t[2] && !(old[5] || '').includes(t.join('|')));
+    await adminCommitText(text => {
+      const mo = ADM.getMembers(text), k = mo.v.findIndex(m => m[0] === oldName);
+      if (k < 0) throw new Error('GitHub上のファイルに ' + oldName + ' が見つかりません');
+      if (name !== oldName && mo.v.some(m => m[0] === name)) throw new Error('GitHub上のファイルに ' + name + ' がもういます');
+      mo.v[k] = row; return text.slice(0, mo.a) + JSON.stringify(mo.v) + text.slice(mo.b);
+    }, (grad ? '卒業・' : '') + `メンバー情報修正：${name}`);
+    MEMBERS[gIdx] = row; MEM_TEN[gIdx] = row[5].split(';').filter(Boolean).map(x => x.split('|'));
+    if (name !== oldName) { ADM_NAME.delete(oldName); ADM_NAME.set(name, gIdx); }
+    $('ag-name').value = name;
+    try { renderSongList(true); if (modalStack.length) renderSongModal(); } catch (e) {}
     alert('保存しました！サイトには1〜2分で反映されます。');
   });
-  $('ag-save').onclick = () => agRun($('ag-save'), true);
-  $('ag-undo').onclick = () => agRun($('ag-undo'), false);
 
   // ---- 元に戻す ----
   const auTime = d => { const t = new Date(d); return `${t.getMonth() + 1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`; };
@@ -5949,6 +6035,7 @@ function adminPanel() {
       d.querySelector('.r-chk').innerHTML = `${a.ok.length}人` + (a.bad.length || c.bad.length ? `　<b class="adm-bad">見つからない名前：${[...a.bad, ...c.bad].join('、')}</b>` : ''); };
     d.querySelectorAll('.r-m,.r-cen').forEach(x => x.oninput = chk); chk();
     rows.appendChild(d);
+    if (window.__admSuggestRow) window.__admSuggestRow(d);
   };
   $('ad-addrow').onclick = () => addRow();
   $('ad-read').onclick = () => {
@@ -6042,9 +6129,7 @@ function adminPanel() {
     if (ADM_NAME.has(name)) throw new Error(name + ' はもういます');
     if (read && !/^[ぁ-んー ]+$/.test(read)) throw new Error('読みはひらがなで入れてください');
     // 期の並び順の数字：同じグループ・同じ期の人と同じ／「○期生」なら 1000+○／それ以外は加入日から
-    let od = 9999; const same = MEMBERS.find(m => m[1] === G && m[3] === ki && ki);
-    const km = ki.match(/^(\d+(?:\.\d+)?)期生$/);
-    if (same) od = same[4]; else if (km) od = 1000 + Number(km[1]); else if (join) { const d = new Date(join); od = Math.round((d.getFullYear() + (d - new Date(d.getFullYear(), 0, 1)) / 864e5 / 366) * 1000) / 1000; }
+    const od = admKiOrder(G, ki, join);
     const row = [name, G, read.replace(/ /g, ''), ki, od, join ? `${G}|${join}|` : '', birth || '', pref, read.includes(' ') ? read : ''];
     if (!confirm(`${name}（${read || '読みなし'}）\n${G}・${ki || '期なし'}\n加入：${join || '不明'}　生年月日：${birth || '不明'}　出身：${pref || '不明'}\n\nGitHub に保存しますか？`)) return;
     await adminCommitText(text => {
@@ -6054,7 +6139,7 @@ function adminPanel() {
       return text.slice(0, mo.a) + JSON.stringify(mo.v) + text.slice(mo.b);
     }, `メンバー追加：${G} ${name}`);
     ADM_NAME.set(name, -1);   // このあと同じ画面で曲に入れられるように（番号は保存のときにGitHub上のファイルから決める）
-    $('adm-mems').insertAdjacentHTML('beforeend', `<option value="${name}">`);
+    MEMBERS.push(row); MEM_TEN.push(join ? [[G, join, '']] : []); MEM_SONGS.push([]);   // この画面の候補にも出す（番号は保存のときに GitHub 上のファイルで決める）
     alert('保存しました！続けて「曲を追加」「メンバー修正」でこの人を入れられます。サイトには1〜2分で反映されます。');
   });
 
